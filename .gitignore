@@ -1,0 +1,10 @@
+/build*
+/.cache
+
+/thirdparty/glfw
+
+# Renderdoc
+*.cap
+
+# RemedyBG
+*.rdbg
