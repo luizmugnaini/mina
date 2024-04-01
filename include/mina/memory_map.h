@@ -88,25 +88,66 @@ namespace mina {
         u8 buf[RANGE.size()]{};
     };
 
-    /// 8 KiB of video RAM (VRAM).
+    /// Video RAM (VRAM).
     struct VideoRAM {
         static constexpr MemoryRange RANGE{0x8000, 0x9FFF};
 
         /// RAM region used exclusively for video-related work.
         ///
-        /// Each tile is 8x8 pixels of 2-bit color (total of 16 bytes).
+        /// This region of memory is composed of 384 tiles, where each tile is 8x8 pixels
+        /// of 2-bit color (total of 16 bytes).
         ///
-        /// Has two tile modes, the unsigned mode (0 to 255) and the signed mode (-127 to 128).
-        static constexpr MemoryRange TILE_RAM{0x8000, 0x97FF};
+        /// These tiles are grouped in blocks of 128 tiles each.
+        ///
+        /// A tile can be displayed either as part of a background map or an object (movable
+        /// sprite).
+        ///
+        /// The tiling system has two indexing modes, the unsigned mode (with ID's 0 to 255, most
+        /// commonly used) and the signed mode (with ID's -128 to 127, a bit odd fashioned).
+        ///
+        /// The object tiles always use the unsigned indexing mode, whereas the background map tiles
+        /// can either use the signed (if `HwRegisterBank::LCDC::tile_sel == 0`)  or unsigned (if
+        /// `HwRegisterBank::LCDC::tile_sel == 1`).
+        struct TileRAM {
+            static constexpr MemoryRange RANGE{0x8000, 0x97FF};
+
+            static constexpr MemoryRange BLOCK_0{0x8000, 0x87FF};
+            static constexpr MemoryRange BLOCK_1{0x8800, 0x8FFF};
+            static constexpr MemoryRange BLOCK_2{0x9000, 0x97FF};
+
+            u8 block_0[BLOCK_0.size()]{};  ///< Tiles 0 to 127 in unsigned mode.
+            u8 block_1[BLOCK_1.size()]{};  ///< Tiles 128 to 255 in unsigned mode (-128 to -1 in
+                                           ///< signed mode).
+            u8 block_2[BLOCK_2.size()]{};  ///< Tiles 0 to 127 in signed mode.
+
+            [[nodiscard]] constexpr u8* unsigned_mode_base_ptr() {
+                return &block_0[0];
+            }
+            [[nodiscard]] constexpr u8* signed_mode_base_ptr() {
+                return &block_2[0];
+            }
+        };
 
         /// 1KiB region used to build the display.
         ///
         /// Each byte represents a tile on the display, therefore the region can hold up to 32x32
-        /// tiles.
-        static constexpr MemoryRange BG_MAP_DATA_1{0x9800, 0x9BFF};
-        static constexpr MemoryRange BG_MAP_DATA_2{0x9C00, 0x9FFF};
+        /// (1024 bytes) tiles.
+        struct TileMap {
+            static constexpr MemoryRange RANGE{0x9800, 0x9BFF};
 
-        u8 buf[RANGE.size()]{};
+            u8 buf[RANGE.size()]{};
+        };
+
+        /// Tile attributes (only available in CGB mode).
+        struct TileAttr {
+            static constexpr MemoryRange RANGE{0x9C00, 0x9FFF};
+
+            u8 buf[RANGE.size()]{};
+        };
+
+        TileRAM  tile_ram{};
+        TileMap  tile_map{};
+        TileAttr tile_attr{};
     };
 
     /// 8 KiB of external RAM (if available on the cartridge).
