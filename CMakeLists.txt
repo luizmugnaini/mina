@@ -228,7 +228,7 @@ add_subdirectory("${THIRDPARTY_DIR}/glfw")
 # ---- Source Files ----
 
 set(
-    MINA_ENGINE_SOURCES
+    MINA_ENGINE_SRC
     # Utilities
     "${CMAKE_SOURCE_DIR}/src/utils/mem.cpp"
 )
@@ -238,7 +238,25 @@ set(
     "${CMAKE_SOURCE_DIR}/src/main.cpp"
 )
 
-add_executable(mina ${MINA_EXE_SRC} ${MINA_ENGINE_SOURCES})
+add_executable(mina ${MINA_EXE_SRC} ${MINA_ENGINE_SRC})
 target_compile_options(mina PUBLIC ${MINA_CXX_FLAGS} ${MINA_CXX_SAN_FLAGS})
 target_link_libraries(mina PUBLIC ${MINA_CXX_SAN_FLAGS} Vulkan::Vulkan glfw)
-target_include_directories(mina PUBLIC "${CMAKE_SOURCE_DIR}/src")
+target_include_directories(mina PUBLIC "${CMAKE_SOURCE_DIR}/include")
+
+add_library(mina_lib ${MINA_ENGINE_SRC})
+target_compile_options(mina_lib PUBLIC ${MINA_CXX_FLAGS} ${MINA_CXX_SAN_FLAGS})
+target_link_libraries(mina_lib PUBLIC ${MINA_CXX_SAN_FLAGS} Vulkan::Vulkan glfw)
+target_include_directories(mina_lib PUBLIC "${CMAKE_SOURCE_DIR}/include")
+
+# ---- Tests ----
+
+list(
+    APPEND TESTS
+        "test_memory_map"
+)
+
+foreach(t IN LISTS TESTS)
+    add_executable(${t} "${CMAKE_SOURCE_DIR}/test/${t}.cpp")
+    target_compile_options(${t} PRIVATE ${COMMON_CXX_FLAGS})
+    target_link_libraries(${t} PUBLIC mina_lib)
+endforeach()

@@ -1,9 +1,10 @@
 /// Common mathematical utilities.
 ///
 /// Author: Luiz G. Mugnaini A. <luizmugnaini@gmail.com>
+
 #pragma once
 
-#include "base.h"
+#include <mina/base.h>
 
 #include <limits>
 
