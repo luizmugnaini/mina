@@ -1,6 +1,7 @@
 /// Base header for the Mina emulator source code.
 ///
 /// Author: Luiz G. Mugnaini A. <luizmugnaini@gmail.com>
+
 #pragma once
 
 #include <cassert>
@@ -108,10 +109,10 @@ namespace mina {
                 return "\x1b[1;31m[ERROR]\x1b[0m";
             case LogLevel::Warning:
                 return "\x1b[1;33m[WARNING]\x1b[0m";
-            case LogLevel::Debug:
-                return "\x1b[1;34m[DEBUG]\x1b[0m";
             case LogLevel::Info:
                 return "\x1b[1;32m[INFO]\x1b[0m";
+            case LogLevel::Debug:
+                return "\x1b[1;34m[DEBUG]\x1b[0m";
         }
     }
 
@@ -198,8 +199,8 @@ namespace mina {
 #    define mina_assert(expr)          ((void)expr)
 #    define mina_assert_msg(expr, msg) ((void)expr)
 #else
-#    define mina_assert(expr) { if (!expr) { mina::log_fmt(__FILE__, __LINE__, mina::LogLevel::Fatal, "Assertion failed: %s\n", #expr); assert(false && "Mina: fatal error, aborting"); } }
-#    define mina_assert_msg(expr, msg) { if (!expr) { mina::log_fmt(__FILE__, __LINE__, mina::LogLevel::Fatal, "Assertion failed: %s, message: %s\n", #expr, msg); assert(false && "Mina: fatal error, aborting"); } }
+#    define mina_assert(expr) { if (!(expr)) { mina::log_fmt(__FILE__, __LINE__, mina::LogLevel::Fatal, "Assertion failed: %s\n", #expr); assert(false && "Mina: fatal error, aborting"); } }
+#    define mina_assert_msg(expr, msg) { if (!(expr)) { mina::log_fmt(__FILE__, __LINE__, mina::LogLevel::Fatal, "Assertion failed: %s, message: %s\n", #expr, msg); assert(false && "Mina: fatal error, aborting"); } }
 #endif
 
     // -------------------------------------------------------------------------------------------------

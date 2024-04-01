@@ -1,13 +1,10 @@
-/// Implementation of the utils/memory.h header file.
+/// Implementation of the mina/utils/mem.h header file.
 ///
 /// Author: Luiz G. Mugnaini A. <luizmugnaini@gmail.com>
-#include "mem.h"
 
-#include "base.h"
+#include <mina/utils/mem.h>
 
-#if defined(MINA_DEBUG) || defined(MINA_CHECK_ALIGNMENT)
-#    include "utils/math.h"  // for is_power_of_two
-#endif
+#include <mina/base.h>
 
 #include <cstring>
 
@@ -38,54 +35,5 @@ namespace mina {
             return;
         }
         mina_unused_result(std::memmove(dest, src, size));
-    }
-
-    usize padding_with_header(
-        uptr  ptr,
-        usize alignment,
-        usize header_size,
-        usize header_alignment) noexcept {
-#if defined(MINA_DEBUG) || defined(MINA_CHECK_ALIGNMENT)
-        mina_assert_msg(
-            is_power_of_two(alignment) && is_power_of_two(header_alignment),
-            "padding_with_header expected the alignments to be powers of two");
-#endif
-
-        uptr padding = 0;
-
-        // Padding necessary for the alignment of the new block of memory.
-        uptr const align = static_cast<uptr>(alignment);
-        uptr const mod_align =
-            ptr & (align - 1);  // Same as `ptr % align` since `align` is a power of two.
-        if (mod_align != 0) {
-            padding += align - mod_align;
-        }
-        ptr += padding;
-
-        // Padding necessary for the header alignment.
-        uptr const align_header = static_cast<uptr>(header_alignment);
-        uptr const mod_header   = ptr & (align_header - 1);  // Same as `ptr % align_header`.
-        if (mod_header != 0) {
-            padding += align_header - mod_header;
-        }
-
-        // The padding should at least contain the header.
-        padding += header_size;
-
-        return static_cast<usize>(padding);
-    }
-
-    usize align_forward(uptr ptr, usize alignment) noexcept {
-#if defined(MINA_DEBUG) || defined(MINA_CHECK_ALIGNMENT)
-        mina_assert_msg(
-            is_power_of_two(alignment),
-            "align_forward expected the alignment to be a power of two");
-#endif
-        uptr const align     = static_cast<uptr>(alignment);
-        uptr const mod_align = ptr & (align - 1);
-        if (mod_align != 0) {
-            ptr += align - mod_align;
-        }
-        return ptr;
     }
 }  // namespace mina
