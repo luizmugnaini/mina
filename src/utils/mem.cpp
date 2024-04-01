@@ -13,7 +13,7 @@ namespace mina {
         if (fat_ptr.buf == nullptr) {
             return;
         }
-        mina_unused_result(std::memset(fat_ptr.buf, fill, fat_ptr.size));
+        mina_unused(std::memset(fat_ptr.buf, fill, fat_ptr.size));
     }
 
     void memory_copy(u8* dest, u8 const* src, usize size) noexcept {
@@ -27,13 +27,13 @@ namespace mina {
             (dest_addr + size > src_addr) || (dest_addr < src_addr + size),
             "memcpy called but source and destination overlap, which produces UB");
 #endif
-        mina_unused_result(std::memcpy(dest, src, size));
+        mina_unused(std::memcpy(dest, src, size));
     }
 
     void memory_move(u8* dest, u8 const* src, usize size) noexcept {
         if (dest == nullptr || src == nullptr) {
             return;
         }
-        mina_unused_result(std::memmove(dest, src, size));
+        mina_unused(std::memmove(dest, src, size));
     }
 }  // namespace mina

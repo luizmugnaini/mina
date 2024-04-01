@@ -7,6 +7,8 @@
 #include <cassert>
 #include <cstdint>
 #include <cstdio>
+#include <cstdlib>
+#include <source_location>
 #include <type_traits>
 
 namespace mina {
@@ -75,12 +77,23 @@ namespace mina {
     /// A pointer to a contiguous array of constant character values.
     using StrPtr = char const*;
 
+    /// A string literal type.
+    ///
+    /// This type is used to enforce the passing of literal strings to formatting functions such as
+    /// `mina::log_fmt`.
     struct StringLiteral {
-        StrPtr str;
+        StrPtr const str;
+        usize const  len;
 
         template <usize N>
-        consteval StringLiteral(char const (&_str)[N]) : str{_str} {}
+        consteval StringLiteral(char const (&_str)[N]) : str{_str}, len{N} {}
+
+        StringLiteral(StringLiteral&)       = delete;
+        StringLiteral(StringLiteral const&) = delete;
     };
+
+/// Simple macro casting an unused result from a function call.
+#define mina_unused(x) (void)x
 
     // -------------------------------------------------------------------------------------------------
     // Logging functionality of the engine.
@@ -123,21 +136,25 @@ namespace mina {
     ///     * line: Current line number of the source file of the caller.
     ///     * level: The level associated to the log message.
     ///     * msg: Log message to be displayed.
-    inline void log_msg(StrPtr file, i32 line, LogLevel level, StrPtr msg) noexcept {
-        (void)std::fprintf(stderr, "%s [%s:%d] %s\n", log_level_str(level), file, line, msg);
+    inline void log_(std::source_location&& loc, LogLevel lvl, StrPtr msg) noexcept {
+#if !defined(MINA_DISABLE_LOGGING)
+        (void)std::fprintf(
+            stderr,
+            "%s [%s:%d] %s\n",
+            log_level_str(lvl),
+            loc.file_name(),
+            loc.line(),
+            msg);
+#endif
     }
 
-    /// Write formatted string to the standard error stream.
-    ///
-    /// Parameters:
-    ///     * file: Name of the source file of the caller.
-    ///     * line: Current line number of the source file of the caller.
-    ///     * level: The level associated to the log message.
-    ///     * fmt: The formatting string.
-    ///     * args: Remaining arguments used by the `fmt` string.
     template <typename... Arg>
-    void
-    log_fmt(StrPtr file, i32 line, LogLevel level, StringLiteral fmt, Arg const&... args) noexcept {
+    void log_fmt_(
+        std::source_location const& loc,
+        LogLevel                    lvl,
+        StringLiteral&&             fmt,
+        Arg const&... args) noexcept {
+#if !defined(MINA_DISABLE_LOGGING)
         constexpr usize max_msg_size = 8192;
 
         // Format the string with the given arguments.
@@ -148,45 +165,26 @@ namespace mina {
         // Stamp the message with a null-terminator.
         usize const msg_size =
             char_count < max_msg_size ? static_cast<usize>(char_count) : max_msg_size;
-        msg[msg_size - 1] = 0;
+        msg[msg_size] = 0;
 
-        (void)std::fprintf(stderr, "%s [%s:%d] %s\n", log_level_str(level), file, line, msg);
+        (void)std::fprintf(
+            stderr,
+            "%s [%s:%d] %s\n",
+            log_level_str(lvl),
+            loc.file_name(),
+            loc.line(),
+            msg);
+#endif
     }
 
-    // -------------------------------------------------------------------------------------------------
-    // Logging macros.
-    // -------------------------------------------------------------------------------------------------
     // clang-format off
+    // {
 
-#if defined(MINA_DISABLE_LOGGING)
-#    define mina_log_fatal(msg)          0
-#    define mina_log_fatal_and_exit(msg) 0
-#    define mina_log_error(msg)          0
-#    define mina_log_warning(msg)        0
-#    define mina_log_debug(msg)          0
-#    define mina_log_info(msg)           0
+#define mina_log(lvl, msg)           mina::log_(std::source_location::current(), lvl, msg)
+#define mina_log_fmt(lvl, fmt, ...)  mina::log_fmt_(std::source_location::current(), lvl, fmt, __VA_ARGS__)
 
-#    define mina_log_fatal_va(msg, ...)          0
-#    define mina_log_fatal_and_exit_va(msg, ...) 0
-#    define mina_log_error_va(msg, ...)          0
-#    define mina_log_warning_va(msg, ...)        0
-#    define mina_log_debug_va(msg, ...)          0
-#    define mina_log_info_va(msg, ...)           0
-#else
-#    define mina_log_fatal(msg) mina::log_msg(__FILE__, __LINE__, mina::LogLevel::Fatal, msg)
-#    define mina_log_fatal_and_exit(msg) { mina::log_msg(__FILE__, __LINE__, mina::LogLevel::Fatal, msg); assert(false && "Mina: fatal error, aborting"); }
-#    define mina_log_error(msg) mina::log_msg(__FILE__, __LINE__, mina::LogLevel::Error, msg)
-#    define mina_log_warning(msg) mina::log_msg(__FILE__, __LINE__, mina::LogLevel::Warning, msg)
-#    define mina_log_debug(msg) mina::log_msg(__FILE__, __LINE__, mina::LogLevel::Debug, msg)
-#    define mina_log_info(msg) mina::log_msg(__FILE__, __LINE__, mina::LogLevel::Info, msg)
-
-#    define mina_log_fatal_va(fmt, ...) mina::log_fmt(__FILE__, __LINE__, mina::LogLevel::Fatal, fmt, __VA_ARGS__)
-#    define mina_log_fatal_and_exit_va(fmt, ...) { mina::log_fmt(__FILE__, __LINE__, mina::LogLevel::Fatal, fmt, __VA_ARGS__); assert(false && "Mina: fatal error, aborting"); }
-#    define mina_log_error_va(fmt, ...) mina::log_fmt(__FILE__, __LINE__, mina::LogLevel::Error, fmt, __VA_ARGS__)
-#    define mina_log_warning_va(fmt, ...) mina::log_fmt(__FILE__, __LINE__, mina::LogLevel::Warning, fmt, __VA_ARGS__)
-#    define mina_log_debug_va(fmt, ...) mina::log_fmt(__FILE__, __LINE__, mina::LogLevel::Debug, fmt, __VA_ARGS__)
-#    define mina_log_info_va(fmt, ...) mina::log_fmt(__FILE__, __LINE__, mina::LogLevel::Info, fmt, __VA_ARGS__)
-#endif
+    // }
+    // clang-format on
 
     // -------------------------------------------------------------------------------------------------
     // Main functionality for writing tests and assertions.
@@ -195,28 +193,26 @@ namespace mina {
     // will make assertions evaluate the given expression and throw away its result.
     // -------------------------------------------------------------------------------------------------
 
-#if defined(MINA_DISABLE_ASSERTS)
-#    define mina_assert(expr)          ((void)expr)
-#    define mina_assert_msg(expr, msg) ((void)expr)
-#else
-#    define mina_assert(expr) { if (!(expr)) { mina::log_fmt(__FILE__, __LINE__, mina::LogLevel::Fatal, "Assertion failed: %s\n", #expr); assert(false && "Mina: fatal error, aborting"); } }
-#    define mina_assert_msg(expr, msg) { if (!(expr)) { mina::log_fmt(__FILE__, __LINE__, mina::LogLevel::Fatal, "Assertion failed: %s, message: %s\n", #expr, msg); assert(false && "Mina: fatal error, aborting"); } }
+    inline void
+    assert_(std::source_location&& src_loc, bool expr_res, StrPtr expr_str, StrPtr msg = "") {
+#if !defined(MINA_DISABLE_ASSERTS)
+        if (!expr_res) {
+            log_fmt_(src_loc, LogLevel::Fatal, "Assertion failed: %s, msg: %s", expr_str, msg);
+            std::abort();
+        }
 #endif
+    }
 
-    // -------------------------------------------------------------------------------------------------
-    // Miscellaneous useful macros.
-    // -------------------------------------------------------------------------------------------------
+    // clang-format off
+    // {
 
-/// Simple macro casting an unused variable to void.
-#define mina_unused_var(x) (void)x
+#define mina_assert(expr)          mina::assert_(std::source_location::current(), expr, #expr)
+#define mina_assert_msg(expr, msg) mina::assert_(std::source_location::current(), expr, #expr, msg)
+#define mina_unreachable()       { mina::log_fmt(std::source_location::current(), mina::LogLevel::Fatal, "Codepath should be unreachable!"); std::abort(); }
 
-/// Simple macro casting an unused result from a function call.
-#define mina_unused_result(x) (void)x
-
-/// Codepath should be unreachable, abort the program.
-#define mina_unreachable() { mina::log_fmt(__FILE__, __LINE__, mina::LogLevel::Fatal, "Codepath should be unreachable!"); assert("Mina: fatal error, aborting"); }
-
+    // }
     // clang-format on
+
     // -------------------------------------------------------------------------------------------------
     // Utility types.
     // -------------------------------------------------------------------------------------------------
@@ -225,11 +221,15 @@ namespace mina {
     template <typename T>
         requires TriviallyCopyable<T>
     struct Option {
+        T const    val{};
+        bool const has_val = false;
+
         constexpr Option() = default;
 
         explicit constexpr Option(T _val)
             requires NotPointer<T>
             : val{_val}, has_val{true} {}
+
         constexpr Option(T _val)
             requires Pointer<T>
             : val{_val}, has_val{_val != nullptr} {}
@@ -248,37 +248,22 @@ namespace mina {
             mina_assert_msg(has_val, msg);
             return val;
         }
-
-    private:
-        T const    val{};
-        bool const has_val = false;
     };
 
     /// Type holding an immutable pointer that can never be null.
     template <typename T>
         requires NotPointer<T>
     struct NotNull {
+        T* const ptr;
+
         /// Create a non-null pointer wrapper.
         ///
         /// Parameters:
         ///     * `ptr`: Non-null pointer.
         ///     * `msg`: Failure message in case `ptr` fails to be non-null.
-        NotNull(T* _ptr, StrPtr msg = "NotNull created with a null pointer") noexcept : ptr_{_ptr} {
-            mina_assert_msg(ptr_ != nullptr, msg);
+        NotNull(T* _ptr, StrPtr msg = "NotNull created with a null pointer") noexcept : ptr{_ptr} {
+            mina_assert_msg(ptr != nullptr, msg);
         }
-
-        [[nodiscard]] constexpr T* ptr() const noexcept {
-            return ptr_;
-        }
-        [[nodiscard]] constexpr T& operator*() const noexcept {
-            return *ptr_;
-        }
-        [[nodiscard]] constexpr T* operator->() const noexcept {
-            return ptr_;
-        }
-
-    private:
-        T* const ptr_;
     };
 
     /// Fat pointer.
@@ -297,6 +282,10 @@ namespace mina {
             }
         }
 
+        static constexpr FatPtr<u8> as_bytes(auto* buf, usize length) noexcept {
+            return FatPtr<u8>{reinterpret_cast<u8*>(buf), sizeof(decltype(*buf)) * length};
+        }
+
         [[nodiscard]] constexpr usize size_bytes() const noexcept {
             return sizeof(T) * size;
         }
@@ -309,8 +298,4 @@ namespace mina {
                                     : reinterpret_cast<T*>(reinterpret_cast<uptr>(buf) + size);
         }
     };
-
-    constexpr FatPtr<u8> fat_ptr_as_bytes(auto* buf, usize length) noexcept {
-        return FatPtr<u8>{reinterpret_cast<u8*>(buf), sizeof(decltype(*buf)) * length};
-    }
 }  // namespace mina

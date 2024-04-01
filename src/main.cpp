@@ -5,6 +5,6 @@
 #include <mina/base.h>
 
 int main() {
-    mina_log_info("Hello, Mina emulator!");
+    mina_log(mina::LogLevel::Info, "Hello, Mina emulator!");
     return 0;
 }
