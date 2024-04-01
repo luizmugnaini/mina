@@ -33,7 +33,7 @@ namespace mina {
     /// 8080.
     struct DMG {
         ControlUnit         ctrl{};
-        RegisterBank        reg{};
+        HwRegisterBank      reg{};
         ArithmeticLogicUnit alu{};
         IncDecUnit          idu{};
     };

@@ -176,28 +176,110 @@ namespace mina {
         u8 const buf[RANGE.size()]{};
     };
 
-    /// 128 bytes hardware register bank.
+    /// Hardware register bank.
     ///
     /// Responsible for holding the state of the CPU registers and I/O controllers.
-    struct RegisterBank {
+    struct HwRegisterBank {
         static constexpr MemoryRange RANGE{0xFF00, 0xFF7F};
 
-        u8 p1 = 0x00;  ///< Joypad.
+        struct P1 {
+            u8 p10     : 1 = 0b0;  ///< Right or A.
+            u8 p11     : 1 = 0b0;  ///< Left or B.
+            u8 p12     : 1 = 0b0;  ///< Up or Select.
+            u8 p13     : 1 = 0b0;  ///< Down or Start.
+            u8 p14     : 1 = 0b0;  ///< d-pad.
+            u8 p15     : 1 = 0b0;  ///< Buttons.
+            u8 unused_ : 2 = 0b00;
+        };
+
+        struct SC {
+            u8 clk     : 1 = 0b0;
+            u8 fast    : 1 = 0b0;
+            u8 unused_ : 5 = 0b00000;
+            u8 en      : 1 = 0b0;
+        };
+
+        struct TAC {
+            u8 clk     : 2 = 0b00;
+            u8 en      : 1 = 0b0;
+            u8 unused_ : 5 = 0b00000;
+        };
+
+        struct IFL {
+            u8 vblank  : 1 = 0b0;
+            u8 stat    : 1 = 0b0;
+            u8 timer   : 1 = 0b0;
+            u8 serial  : 1 = 0b0;
+            u8 joypad  : 1 = 0b0;
+            u8 unused_ : 3 = 0b000;
+        };
+
+        struct LCDC {
+            u8 bg_en    : 1 = 0b0;
+            u8 obj_en   : 1 = 0b0;
+            u8 obj_size : 1 = 0b0;
+            u8 tile_sel : 1 = 0b0;
+            u8 win_en   : 1 = 0b0;
+            u8 win_map  : 1 = 0b0;
+            u8 lcd_en   : 1 = 0b0;
+        };
+
+        struct STAT {
+            u8 lcd_mode : 2 = 0b00;
+            u8 lyc_stat : 1 = 0b0;
+            u8 intr_m0  : 1 = 0b0;
+            u8 intr_m1  : 1 = 0b0;
+            u8 intr_m2  : 1 = 0b0;
+            u8 intr_lyc : 1 = 0b0;
+        };
+
+        struct Key1 {
+            u8 en      : 1 = 0b0;
+            u8 unused_ : 6 = 0b000000;
+            u8 fast    : 1 = 0b0;
+        };
+
+        struct VBK {
+            u8 vbk     : 2 = 0b00;
+            u8 unused_ : 6 = 0b000000;
+        };
+
+        struct Boot {
+            u8 off     : 1 = 0b0;
+            u8 unused_ : 7 = 0b0000000;
+        };
+
+        struct SVBK {
+            u8 svbk    : 1 = 0b0;
+            u8 unused_ : 7 = 0b0000000;
+        };
+
+        struct PCM12 {
+            u8 ch1 : 4 = 0x0;
+            u8 ch2 : 4 = 0x0;
+        };
+
+        struct PCM34 {
+            u8 ch3  : 4 = 0x0;
+            u8 chr4 : 4 = 0x0;
+        };
+
+        P1 p1{};       ///< Joypad.
 
         u8 sb = 0x00;  ///< Serial transfer data.
-        u8 sc = 0x00;  ///< Serial transfer control.
+        SC sc{};       ///< Serial transfer control.
 
         u8 unused_0xFF03 = 0x00;
 
-        u8 div = 0x00;   ///< Divider register.
+        u8 div = 0x00;    ///< Divider register.
 
-        u8 tima = 0x00;  ///< Time counter.
-        u8 tma  = 0x00;  ///< Timer modulo.
-        u8 tac  = 0x00;  ///< Timer control.
+        u8  tima = 0x00;  ///< Time counter.
+        u8  tma  = 0x00;  ///< Timer modulo.
+        TAC tac{};        ///< Timer control.
 
         u8 unused_0xFF08_to_0xFF0E[0xFF0E - (0xFF08 - 1)]{};
 
-        u8 ifl = 0x00;   ///< Interrupt flag.
+        IFL ifl{};       ///< Interrupt flag.
 
         u8 nr10 = 0x00;  ///< Sound channel 1: sweep.
         u8 nr11 = 0x00;  ///< Sound channel 1: length timer and duty cycle.
@@ -249,36 +331,36 @@ namespace mina {
         u8 wav14 = 0x00;
         u8 wav15 = 0x00;
 
-        u8 lcdc = 0x00;  ///< LCD control.
-        u8 stat = 0x00;  ///< LCD status.
-        u8 scy  = 0x00;  ///< Viewport y position.
-        u8 scx  = 0x00;  ///< Viewport x position.
-        u8 ly   = 0x00;  ///< LCD y coordinate.
-        u8 lyc  = 0x00;  ///< `ly` compare.
+        LCDC lcdc{};      ///< LCD control.
+        STAT stat{};      ///< LCD status.
+        u8   scy = 0x00;  ///< Viewport y position.
+        u8   scx = 0x00;  ///< Viewport x position.
+        u8   ly  = 0x00;  ///< LCD y coordinate.
+        u8   lyc = 0x00;  ///< `ly` compare.
 
-        u8 dma  = 0x00;  ///< OAM DMA source address and start.
-        u8 bgp  = 0x00;  ///< BG palette data.
-        u8 obp0 = 0x00;  ///< Object palette 0 data.
-        u8 obp1 = 0x00;  ///< Object palette 1 data.
+        u8 dma  = 0x00;   ///< OAM DMA source address and start.
+        u8 bgp  = 0x00;   ///< BG palette data.
+        u8 obp0 = 0x00;   ///< Object palette 0 data.
+        u8 obp1 = 0x00;   ///< Object palette 1 data.
 
-        u8 wy = 0x00;    ///< Window y position.
-        u8 wx = 0x00;    ///< Window x position.
+        u8 wy = 0x00;     ///< Window y position.
+        u8 wx = 0x00;     ///< Window x position.
 
         u8 unused_0xFF4C = 0x00;
 
-        u8 key1 = 0x00;  ///< Prepare speed switch.
+        Key1 key1{};  ///< Prepare speed switch.
 
         u8 unused_0xFF4E = 0x00;
 
-        u8 vkb   = 0x00;  ///< VRAM bank.
-        u8 boot  = 0x00;  ///< Boot.
-        u8 hdma1 = 0x00;  ///< VRAM DMA source high.
-        u8 hdma2 = 0x00;  ///< VRAM DMA source low.
-        u8 hdma3 = 0x00;  ///< VRAM DMA destination high.
-        u8 hdma4 = 0x00;  ///< VRAM DMA destination low.
-        u8 hdma5 = 0x00;  ///< VRAM DMA length/mode/start.
+        VBK  vkb{};         ///< VRAM bank.
+        Boot boot{};        ///< Boot.
+        u8   hdma1 = 0x00;  ///< VRAM DMA source high.
+        u8   hdma2 = 0x00;  ///< VRAM DMA source low.
+        u8   hdma3 = 0x00;  ///< VRAM DMA destination high.
+        u8   hdma4 = 0x00;  ///< VRAM DMA destination low.
+        u8   hdma5 = 0x00;  ///< VRAM DMA length/mode/start.
 
-        u8 rp = 0x00;     ///< Infrared communication port.
+        u8 rp = 0x00;       ///< Infrared communication port.
 
         u8 unused_0xFF57_to_0xFF67[0xFF67 - (0xFF57 - 1)]{};
 
@@ -291,12 +373,12 @@ namespace mina {
 
         u8 unused_0xFF6D_to_0xFF6F[0xFF6F - (0xFF6D - 1)]{};
 
-        u8 svbk = 0x00;  ///< WRAM bank.
+        SVBK svbk{};  ///< WRAM bank.
 
         u8 unused_0xFF71_to_0xFF75[0xFF75 - (0xFF71 - 1)]{};
 
-        u8 pcm12 = 0x00;  ///< Audio digital outputs 1 and 2.
-        u8 pcm34 = 0x00;  ///< Audio digital outputs 3 and 4.
+        PCM12 pcm12{};  ///< Audio digital outputs 1 and 2.
+        PCM34 pcm34{};  ///< Audio digital outputs 3 and 4.
 
         u8 unused_0xFF78_to_0xFF7F[0xFF7F - (0xFF78 - 1)]{};
     };
@@ -316,7 +398,12 @@ namespace mina {
     struct InterruptEnable {
         static constexpr MemoryRange RANGE{0xFFFF};
 
-        u8 reg = 0x0000;
+        u8 vblank  : 1 = 0b0;
+        u8 stat    : 1 = 0b0;
+        u8 timer   : 1 = 0b0;
+        u8 serial  : 1 = 0b0;
+        u8 joypad  : 1 = 0b0;
+        u8 unused_ : 3 = 0b000;
     };
 
     /// Game Boy's memory map.
@@ -332,7 +419,7 @@ namespace mina {
         EchoRAM          echo{};
         SpriteOAM        sprite{};
         ProhibitedRegion prohibited{};
-        RegisterBank     reg{};
+        HwRegisterBank   reg{};
         HighRAM          hram{};
         InterruptEnable  ie{};
     };

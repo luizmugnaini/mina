@@ -17,8 +17,8 @@ void packed_mem() {
     static_assert(EchoRAM::RANGE.start == SwWorkRAM::RANGE.end + 1);
     static_assert(SpriteOAM::RANGE.start == EchoRAM::RANGE.end + 1);
     static_assert(ProhibitedRegion::RANGE.start == SpriteOAM::RANGE.end + 1);
-    static_assert(RegisterBank::RANGE.start == ProhibitedRegion::RANGE.end + 1);
-    static_assert(HighRAM::RANGE.start == RegisterBank::RANGE.end + 1);
+    static_assert(HwRegisterBank::RANGE.start == ProhibitedRegion::RANGE.end + 1);
+    static_assert(HighRAM::RANGE.start == HwRegisterBank::RANGE.end + 1);
     static_assert(InterruptEnable::RANGE.start == HighRAM::RANGE.end + 1);
 
     mina_log_info_va("%s test passed.", __func__);
@@ -27,6 +27,11 @@ void packed_mem() {
 void correct_sizes() {
     static_assert(sizeof(FxROMBank::InterruptVT) == 0x0100);
     static_assert(sizeof(FxROMBank::CartHeader) == 0x0050);
+
+    static_assert(sizeof(VideoRAM::TileRAM) == 0x1800);
+    static_assert(sizeof(VideoRAM::TileMap) == 0x0400);
+    static_assert(sizeof(VideoRAM::TileAttr) == 0x0400);
+
     static_assert(sizeof(FxROMBank) == 0x4000);
     static_assert(sizeof(SwROMBank) == 0x4000);
     static_assert(sizeof(VideoRAM) == 0x2000);
@@ -36,7 +41,7 @@ void correct_sizes() {
     static_assert(sizeof(EchoRAM) == 0x1E00);
     static_assert(sizeof(SpriteOAM) == 0xA0);
     static_assert(sizeof(ProhibitedRegion) == 0x60);
-    static_assert(sizeof(RegisterBank) == 0x80);
+    static_assert(sizeof(HwRegisterBank) == 0x80);
     static_assert(sizeof(HighRAM) == 127);
     static_assert(sizeof(InterruptEnable) == 1);
     static_assert(sizeof(MemoryMap) == 0x10000);
