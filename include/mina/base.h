@@ -65,8 +65,9 @@ namespace mina {
     using isize = i64;
 
     /// Memory-address types.
-    using uptr = u64;
-    using iptr = i64;
+    using uptr    = u64;
+    using iptr    = i64;
+    using BusAddr = u16;
 
     /// Floating-point types.
     using f32 = float;

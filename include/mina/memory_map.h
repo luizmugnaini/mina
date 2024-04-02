@@ -89,25 +89,94 @@ namespace mina {
     };
 
     /// Video RAM (VRAM).
+    ///
+    /// In the Game Boy, each each tile sprite has 8x8 pixels and every tile map is composed of
+    /// 32x32 tiles (resulting in a total of 256x256 pixels in total). Due to the LCD screen of the
+    /// console only supporting 160x144 pixels these tiles have negative offsets in both x and y
+    /// coordinates.
+    ///
+    /// # Graphics Layers
+    ///
+    /// ## Background
+    ///
+    /// The background is composed of a matrix of tiles, called a tile map.
+    ///
+    /// ## Window
+    ///
+    /// Non-flexible second layer of non-transparent background tiles sitting on top of the
+    /// background layer. It's tile positions can only be manipulated through the top-left pixel of
+    /// the tile.
+    ///
+    /// ## Objects
+    ///
+    /// Objects are composed of 1 or 2 tiles and can flexibly be displayed at any position. Objects
+    /// represent entities such as the main character or enemies.
+    ///
+    /// Objects can be combined in order to produce what we call a sprite. Each object composing a
+    /// sprite is called a meta-sprite.
     struct VideoRAM {
         static constexpr MemoryRange RANGE{0x8000, 0x9FFF};
 
-        /// RAM region used exclusively for video-related work.
+        /// Tile RAM, or tile data.
         ///
         /// This region of memory is composed of 384 tiles, where each tile is 8x8 pixels
-        /// of 2-bit color (total of 16 bytes).
-        ///
-        /// These tiles are grouped in blocks of 128 tiles each.
+        /// of 2-bit color (total of 16 bytes per tile). These tiles are grouped in blocks of 128
+        /// tiles each.
         ///
         /// A tile can be displayed either as part of a background map or an object (movable
         /// sprite).
         ///
+        /// # Tile memory layout in the blocks
+        ///
+        /// Each tile has its 16 bytes consecutively laid in their corresponding address. If we have
+        /// a tile T whose n-th byte (from highest to lowest) is named b_n, then T would appear as
+        /// follows:
+        ///
+        ///                     +----+----+----+---+----+----+---+--
+        ///                     |b_01|b_02|b_03|...|b_14|b_15|b16|
+        ///                     +----+----+----+---+----+----+---+--
+        ///                     |    |    |    |   |    |    |   |
+        ///
+        /// Each of the 8 lines that compose T are encoded by two consecutive bytes, for instance:
+        ///
+        ///             +----+----+          +----+----+               +----+----+
+        ///     Line 1: |b_01|b_02|, line 2: |b_03|b_04|, ..., line 8: |b_15|b_16|
+        ///             +----+----+          +----+----+               +----+----+
+        ///
+        /// Rather non-intuitively, the bytes of each line are swapped in order, which means that
+        /// for line 1:
+        ///     * b_02 is the high byte.
+        ///     * b_01 is the low byte.
+        ///
+        /// # Color ID's (2BPP)
+        ///
+        /// Color ID's range from 0 to 3 (four shades of gray). Each pixel has a color depth of
+        /// 2-bits (hence called 2-bits per pixel, aka 2BPP). For object sprites, the ID 0 means
+        /// transparency of the corresponding pixel.
+        ///
+        /// Considering again tile T, let's compute the color ID's of line 1. The line 1 has its
+        /// actual byte layout given by [b_02 b_01] as explained before. If we expand these bytes
+        /// into their binary form, we would have something like this:
+        ///     * b_01 in binary: [y_1 y_2 y_3 y_4 y_5 y_7 y_8].
+        ///     * b_02 in binary: [z_1 z_2 z_3 z_4 z_5 z_7 z_8].
+        /// Now we combine these bits to form the 2-bit color ID's for each pixel. From the
+        /// leftmost to the rightmost pixel of the line 1 of tile T we would have:
+        ///
+        ///      [z_1 y_1] [z_2 y_2] [z_3 y_3] [z_4 y_4] [z_5 y_5] [z_6 y_6] [z_7 y_7] [z_8 y_8]
+        ///          ^                                                                     ^
+        ///          |                                                                     |
+        ///    left px col ID                                                       right px col ID
+        ///
+        ///
+        /// # Tile indexing
+        ///
         /// The tiling system has two indexing modes, the unsigned mode (with ID's 0 to 255, most
         /// commonly used) and the signed mode (with ID's -128 to 127, a bit odd fashioned).
         ///
-        /// The object tiles always use the unsigned indexing mode, whereas the background map tiles
-        /// can either use the signed (if `HwRegisterBank::LCDC::tile_sel == 0`)  or unsigned (if
-        /// `HwRegisterBank::LCDC::tile_sel == 1`).
+        /// The object tiles always use the unsigned indexing mode, whereas the background map tile
+        /// indexing is controlled by the value of the LCDC register:
+        ///     * If `HwRegisterBank::LCDC::tile_sel == 0`, signed indexing.
+        ///     * If `HwRegisterBank::LCDC::tile_sel == 1`, unsigned indexing.
         struct TileRAM {
             static constexpr MemoryRange RANGE{0x8000, 0x97FF};
 
@@ -120,15 +189,22 @@ namespace mina {
                                            ///< signed mode).
             u8 block_2[BLOCK_2.size()]{};  ///< Tiles 0 to 127 in signed mode.
 
-            [[nodiscard]] constexpr u8* unsigned_mode_base_ptr() {
+            [[nodiscard]] constexpr u8* unsigned_mode_base_ptr() noexcept {
                 return &block_0[0];
             }
-            [[nodiscard]] constexpr u8* signed_mode_base_ptr() {
+            [[nodiscard]] constexpr u8* signed_mode_base_ptr() noexcept {
                 return &block_2[0];
+            }
+
+            /// The index of a tile equals the middle nibbles of the address.
+            ///
+            /// Example: if `0x8872` is the address of the tile, then its index is `0x87`
+            [[nodiscard]] static constexpr u8 unsigned_idx(BusAddr addr) noexcept {
+                return addr_middle_byte(addr);
             }
         };
 
-        /// 1KiB region used to build the display.
+        /// Region used to build the display.
         ///
         /// Each byte represents a tile on the display, therefore the region can hold up to 32x32
         /// (1024 bytes) tiles.
@@ -141,6 +217,14 @@ namespace mina {
         /// Tile attributes (only available in CGB mode).
         struct TileAttr {
             static constexpr MemoryRange RANGE{0x9C00, 0x9FFF};
+
+            struct BGMapAttr {
+                u8 col_palette : 3 = 0b000;  ///< Color palette selection.
+                u8 bank        : 1 = 0b0;    ///< 0: fetch from bank 0; 1: fetch from bank 1.
+                u8 unused_     : 1 = 0b0;
+                u8 x_flipped   : 1 = 0b0;    ///< 0: normal; 1: tile vertically mirrored.
+                u8 y_flipped   : 1 = 0b0;    ///< 0: normal; 1: tile horizontally mirrored.
+            };
 
             u8 buf[RANGE.size()]{};
         };
@@ -225,9 +309,9 @@ namespace mina {
 
         struct P1 {
             u8 p10     : 1 = 0b0;  ///< Right or A.
-            u8 p11     : 1 = 0b0;  ///< Left or B.
-            u8 p12     : 1 = 0b0;  ///< Up or Select.
-            u8 p13     : 1 = 0b0;  ///< Down or Start.
+            u8 p11     : 1 = 0b0;  ///< Left  or B.
+            u8 p12     : 1 = 0b0;  ///< Up    or Select.
+            u8 p13     : 1 = 0b0;  ///< Down  or Start.
             u8 p14     : 1 = 0b0;  ///< d-pad.
             u8 p15     : 1 = 0b0;  ///< Buttons.
             u8 unused_ : 2 = 0b00;
@@ -354,7 +438,7 @@ namespace mina {
 
         u8 unused_0xFF27_to_0xFF2F[0xFF2F - (0xFF27 - 1)]{};
 
-        ///< Storage for one of the sound channels' waveform.
+        /// Storage for one of the sound channels' waveform.
         u8 wav00 = 0x00;
         u8 wav01 = 0x00;
         u8 wav02 = 0x00;

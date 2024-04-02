@@ -11,6 +11,10 @@ namespace mina {
         return 1 << n;
     }
 
+    constexpr u8 addr_middle_byte(BusAddr addr) noexcept {
+        return (addr >> 4) & 0xff;
+    }
+
     template <typename T>
     using MatchFn = bool(T lhs, T rhs);
 
