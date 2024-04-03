@@ -134,6 +134,19 @@ namespace mina {
     struct VideoRAM {
         static constexpr MemoryRange RANGE{0x8000, 0x9FFF};
 
+        enum class Layer {
+            Bg,   ///< Background layer.
+            Win,  ///< Window layer.
+            Obj,  ///< Object layer.
+        };
+
+        enum ColorID {
+            c0 = 0,
+            c1 = 1,
+            c2 = 2,
+            c3 = 3,
+        };
+
         /// Tile RAM, or tile data.
         ///
         /// This region of memory is composed of 384 tiles, where each tile is 8x8 pixels
@@ -201,10 +214,14 @@ namespace mina {
             static constexpr MemoryRange BLOCK_1{0x8800, 0x8FFF};
             static constexpr MemoryRange BLOCK_2{0x9000, 0x97FF};
 
-            u8 block_0[BLOCK_0.size()]{};  ///< Tiles 0 to 127 in unsigned mode.
-            u8 block_1[BLOCK_1.size()]{};  ///< Tiles 128 to 255 in unsigned mode (-128 to -1 in
-                                           ///< signed mode).
-            u8 block_2[BLOCK_2.size()]{};  ///< Tiles 0 to 127 in signed mode.
+            /// Tiles 0 to 127 in unsigned mode.
+            u8 block_0[BLOCK_0.size()]{};
+
+            /// Tiles 128 to 255 in unsigned mode (-128 to -1 in signed mode).
+            u8 block_1[BLOCK_1.size()]{};
+
+            /// Tiles 0 to 127 in signed mode.
+            u8 block_2[BLOCK_2.size()]{};
 
             [[nodiscard]] constexpr u8* unsigned_mode_base_ptr() noexcept {
                 return &block_0[0];
@@ -221,34 +238,49 @@ namespace mina {
             }
         };
 
-        /// Region used to build the display.
+        /// Tile map data (aka VRAM Bank 0).
         ///
-        /// Each byte represents a tile on the display, therefore the region can hold up to 32x32
-        /// (1024 bytes) tiles.
+        /// The 1KiB region holds up exactly 32x32 tiles in the following way:
+        ///
+        /// Each byte of `TileMap` is the ID of the corresponding tile in the `TileRAM` (which may
+        /// reside in any of the 3 blocks depending on the Game Boy runtime mode). The bank
         struct TileMap {
-            static constexpr MemoryRange RANGE{0x9800, 0x9BFF};
+            static constexpr MemoryRange BANK_0{0x9800, 0x9BFF};
+            static constexpr MemoryRange BANK_1{0x9C00, 0x9FFF};
 
-            u8 buf[RANGE.size()]{};
-        };
-
-        /// Tile attributes (only available in CGB mode).
-        struct TileAttr {
-            static constexpr MemoryRange RANGE{0x9C00, 0x9FFF};
-
+            /// Background map attributes
             struct BGMapAttr {
-                u8 col_palette : 3 = 0b000;  ///< Color palette selection.
-                u8 bank        : 1 = 0b0;    ///< 0: fetch from bank 0; 1: fetch from bank 1.
-                u8 unused_     : 1 = 0b0;
-                u8 x_flipped   : 1 = 0b0;    ///< 0: normal; 1: tile vertically mirrored.
-                u8 y_flipped   : 1 = 0b0;    ///< 0: normal; 1: tile horizontally mirrored.
+                /// Color palette selection BGP (0 to 7).
+                u8 col_palette : 3 = 0b000;
+
+                /// Which bank to fetch the data:
+                ///     * 0: `VideoRAM::Tilemap::bank_0`.
+                ///     * 1: `VideoRAM::Tilemap::bank_1`.
+                u8 bank : 1 = 0b0;
+
+                u8 unused_ : 1 = 0b0;
+
+                /// 0: Normal; 1: Tile vertically mirrored.
+                u8 x_flipped : 1 = 0b0;
+
+                /// 0: Normal; 1: Tile horizontally mirrored.
+                u8 y_flipped : 1 = 0b0;
+
+                /// This is a quirky bit and has to account for other register bits. For more
+                /// information, please check `HwRegistersBank::LCDC::bg_en` docs.
+                ///
+                /// Behaviour:
+                ///     * 0: Use OAM priority `SpriteOAM::Attr::Flags::priority`.
+                ///     * 1: The color 1-3 of BG/window tile are drawn over the object.
+                u8 priority : 1 = 0b0;
             };
 
-            u8 buf[RANGE.size()]{};
+            u8        bank_0[BANK_0.size()]{};  ///< Tile ID's.
+            BGMapAttr bank_1[BANK_1.size()]{};  ///< [CGB only] Tile attributes.
         };
 
-        TileRAM  tile_ram{};
-        TileMap  tile_map{};
-        TileAttr tile_attr{};
+        TileRAM tile_ram{};
+        TileMap tile_map{};
     };
 
     /// 8 KiB of external RAM (if available on the cartridge).
@@ -292,19 +324,59 @@ namespace mina {
 
         /// Sprite attribute.
         struct Attr {
-            /// The x location in screen for the tile. This position is offset by 8 pixels, that is,
-            /// the tile with `x_loc = 0` is off-screen by 8 pixels in the x direction.
-            u8 x_loc = 0x00;
+            struct Flags {
+                /// [CGB only] Chooses which of OBP (0 to 7) should be used.
+                u8 cgb_palette : 3 = 0b0;
 
-            /// The y location in screen for the tile. This position is offset by 16 pixels, that
-            /// is, the tile with `y_loc = 0` is off-screen by 16 pixels in the y direction.
+                /// [CGB only] Chooses the bank to fetch the data:
+                ///     *
+                ///     TODO: continue
+                u8 bank : 1 = 0b0;
+
+                /// [Non-CGB only] Chooses between OBP0 (0) and OBP1 (1).
+                u8 dmg_palette : 1 = 0b0;
+
+                u8 x_flip : 1 = 0b0;
+
+                u8 y_flip : 1 = 0b0;
+
+                u8 priority : 1 = 0b0;
+            };
+
+            /// The y location in screen for the tile.
+            ///
+            /// This position is offset by 16 pixels, that is, the tile with `y_loc = 0` is
+            /// off-screen by 16 pixels in the y direction. Based on that, we have the following
+            /// assertions:
+            ///     * `y_loc = 0`: Object is hidden.
+            ///     * `y_loc = 1`: Any 8x8 object is hidden, however an 8x16 object has its bottom 2
+            ///                    lines showing.
+            ///     * `y_loc = 16`: The object is placed aligned with the top line of the screen.
+            ///     * `y_loc = 144`: 8x16 objects are displayed aligned with the bottom line of the
+            ///                      screen.
+            ///     * `y_loc = 152`: 8x8 objects are displayed aligned with the bottom line of the
+            ///                      screen.
+            ///     * `y_loc = 154`: The top 6 lines of the object are displayed in the bottom of
+            ///                      the screen.
+            ///     * `y_loc >= 160`: Object is hidden.
             u8 y_loc = 0x00;
+
+            /// The x location in screen for the tile.
+            ///
+            /// This position is offset by 8 pixels, that is, the tile with `x_loc = 0` is
+            /// off-screen by 8 pixels in the x direction. Since every object has a fixed width of 8
+            /// pixels, it works a bit differently than `y_loc`:
+            ///     * `x_loc = 0`: Object is hidden.
+            ///     * `x_loc = 8`: Object is displayed aligned with the left of the screen.
+            ///     * `x_loc = 152`: Object is displayed aligned with the right of the screen.
+            ///     * `x_loc >= 168`: Object is hidden.
+            u8 x_loc = 0x00;
 
             /// The number that corresponds to the tile.
             u8 tile_id = 0x00;
 
             /// Attributes associated to the tile.
-            u8 attr = 0x00;
+            Flags attr{};
         };
 
         Attr buf[RANGE.size() / sizeof(Attr)]{};
@@ -357,13 +429,70 @@ namespace mina {
         };
 
         struct LCDC {
-            u8 bg_en    : 1 = 0b0;
-            u8 obj_en   : 1 = 0b0;
+            /// Background/Window display control.
+            ///
+            /// This bit has some quirks depending on the running mode of the Game Boy:
+            ///     * Non-CGB: If `bg_en = 0` then both the background and window are blank (white
+            ///                color), and the `win_en` bit is completely disregarded.
+            ///     * CGB: If `bg_en = 0` then both the background and window layers lose their
+            ///            priority to the object layer. In such case, the object is always rendered
+            ///            on top of the other layers.
+            ///
+            ///            If `bg_en = 1`, the priority of the layers has to be calculated
+            ///            considering the bit `VideoRAM::TileAttr::BGMapAttr::priority` (which I'll
+            ///            abbreviate by `bgm_p`) and the sprite OAM 7th bit
+            ///            `SpriteOAM::Attr::Flags::priority` (abbreviated as `oam_p`). The
+            ///            following is the resulting relational table:
+            ///
+            ///                 +-----+-----+-----+----------------------------+
+            ///                 |bg_en|oam_p|bmg_p|         Priority           |
+            ///                 +-----+-----+-----+----------------------------+
+            ///                 |  0  |  0  |  0  |            obj             |
+            ///                 +-----+-----+-----+----------------------------+
+            ///                 |  0  |  0  |  1  |            obj             |
+            ///                 +-----+-----+-----+----------------------------+
+            ///                 |  0  |  1  |  0  |            obj             |
+            ///                 +-----+-----+-----+----------------------------+
+            ///                 |  0  |  1  |  1  |            obj             |
+            ///                 +-----+-----+-----+----------------------------+
+            ///                 |  1  |  0  |  0  |            obj             |
+            ///                 +-----+-----+-----+----------------------------+
+            ///                 |  1  |  0  |  1  | bg color 1-3 otherwise obj |
+            ///                 +-----+-----+-----+----------------------------+
+            ///                 |  1  |  1  |  0  | bg color 1-3 otherwise obj |
+            ///                 +-----+-----+-----+----------------------------+
+            ///                 |  1  |  1  |  1  | bg color 1-3 otherwise obj |
+            ///                 +-----+-----+-----+----------------------------+
+            u8 bg_en : 1 = 0b0;
+
+            /// Enable the rendering of the object.
+            u8 obj_en : 1 = 0b0;
+
+            /// Size of the object:
+            ///     * 0: Object is 8x8.
+            ///     * 1: Object is 8x16.
             u8 obj_size : 1 = 0b0;
-            u8 tile_sel : 1 = 0b0;
-            u8 win_en   : 1 = 0b0;
-            u8 win_map  : 1 = 0b0;
-            u8 lcd_en   : 1 = 0b0;
+
+            /// Background memory region:
+            ///     * 0: `VideoRAM::TileMap` block.
+            ///     * 1: `VideoRAM::TileAttr` block.
+            u8 bg_map : 1 = 0b0;
+
+            /// Background/window memory region:
+            ///     * 0: `VideoRAM::TileRAM::BLOCK_0`.
+            ///     * 1: `VideoRAM::TileRAM::BLOCK_1`.
+            u8 win_map : 1 = 0b0;
+
+            /// Enable the rendering of the window.
+            ///
+            /// For non-CGB mode, this only works if `bg_en` is set.
+            u8 win_en : 1 = 0b0;
+
+            /// Enable LCD and PPU.
+            ///
+            /// Changing `lcd_en` from ON (1) to OFF (0) is *strictly prohibited* outside of the
+            /// VBlank period (Game Boy hardware may be damaged if so).
+            u8 lcd_en : 1 = 0b0;
         };
 
         struct STAT {
@@ -485,8 +614,9 @@ namespace mina {
         u8 obp0 = 0x00;   ///< Object palette 0 data.
         u8 obp1 = 0x00;   ///< Object palette 1 data.
 
-        u8 wy = 0x00;     ///< Window y position.
-        u8 wx = 0x00;     ///< Window x position.
+        /// The top-left coordinate of the window is (x, y) = (wx - 7, wy).
+        u8 wy = 0x00;  ///< Window y position.
+        u8 wx = 0x00;  ///< Window x position.
 
         u8 unused_0xFF4C = 0x00;
 
