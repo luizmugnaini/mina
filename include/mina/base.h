@@ -25,7 +25,6 @@
 #include <cstdint>
 #include <cstdio>
 #include <cstdlib>
-#include <source_location>
 #include <type_traits>
 
 namespace mina {
@@ -132,6 +131,18 @@ namespace mina {
         Debug   = 4,  ///< Serves only for debugging purposes in development.
     };
 
+    struct LogInfo {
+        StrPtr const   file;  ///< Source file name.
+        u32 const      line;  ///< Source current line.
+        LogLevel const lvl;   ///< Severity level.
+
+        consteval LogInfo(
+            LogLevel _lvl,
+            StrPtr   _file = __builtin_FILE(),
+            u32      _line = __builtin_LINE())
+            : file{_file}, line{_line}, lvl{_lvl} {}
+    };
+
     constexpr StrPtr log_level_str(LogLevel level) {
         switch (level) {
             case LogLevel::Fatal:
@@ -154,24 +165,20 @@ namespace mina {
     ///     * line: Current line number of the source file of the caller.
     ///     * level: The level associated to the log message.
     ///     * msg: Log message to be displayed.
-    inline void log_(std::source_location&& loc, LogLevel lvl, StrPtr msg) noexcept {
+    inline void log(LogInfo&& info, StrPtr msg) noexcept {
 #if !defined(MINA_DISABLE_LOGGING)
         (void)std::fprintf(
             stderr,
             "%s [%s:%d] %s\n",
-            log_level_str(lvl),
-            loc.file_name(),
-            loc.line(),
+            log_level_str(info.lvl),
+            info.file,
+            info.line,
             msg);
 #endif
     }
 
     template <typename... Arg>
-    void log_fmt_(
-        std::source_location const& loc,
-        LogLevel                    lvl,
-        StringLiteral&&             fmt,
-        Arg const&... args) noexcept {
+    void log_fmt(LogInfo const& info, StringLiteral&& fmt, Arg const&... args) noexcept {
 #if !defined(MINA_DISABLE_LOGGING)
         constexpr usize max_msg_size = 8192;
 
@@ -188,48 +195,35 @@ namespace mina {
         (void)std::fprintf(
             stderr,
             "%s [%s:%d] %s\n",
-            log_level_str(lvl),
-            loc.file_name(),
-            loc.line(),
+            log_level_str(info.lvl),
+            info.file,
+            info.line,
             msg);
 #endif
     }
 
-    // clang-format off
-    // {
-
-#define mina_log(lvl, msg)           mina::log_(std::source_location::current(), lvl, msg)
-#define mina_log_fmt(lvl, fmt, ...)  mina::log_fmt_(std::source_location::current(), lvl, fmt, __VA_ARGS__)
-
-    // }
-    // clang-format on
-
     // -------------------------------------------------------------------------------------------------
     // Main functionality for writing tests and assertions.
     //
-    // In order to disable assertions you can compile with the flag `-DMINA_DISABLE_ASSERTS`. This
-    // will make assertions evaluate the given expression and throw away its result.
+    // In order to disable assertions you can compile with the flag `-DMINA_DISABLE_ASSERTS`.
+    // This will make assertions evaluate the given expression and throw away its result.
     // -------------------------------------------------------------------------------------------------
 
-    inline void
-    assert_(std::source_location&& src_loc, bool expr_res, StrPtr expr_str, StrPtr msg = "") {
+    inline void assert_(
+        bool           expr_res,
+        StrPtr         expr_str,
+        StrPtr         msg  = "",
+        LogInfo const& info = LogLevel{LogLevel::Fatal}) {
 #if !defined(MINA_DISABLE_ASSERTS)
         if (!expr_res) {
-            log_fmt_(src_loc, LogLevel::Fatal, "Assertion failed: %s, msg: %s", expr_str, msg);
+            log_fmt(info, "Assertion failed: %s, msg: %s", expr_str, msg);
             std::abort();
         }
 #endif
     }
 
-    // clang-format off
-    // {
-
-#define mina_assert(expr)          mina::assert_(std::source_location::current(), expr, #expr)
-#define mina_assert_msg(expr, msg) mina::assert_(std::source_location::current(), expr, #expr, msg)
-#define mina_unreachable()       { mina::log_fmt(std::source_location::current(), mina::LogLevel::Fatal, "Codepath should be unreachable!"); std::abort(); }
-
-    // }
-    // clang-format on
+#define mina_assert(expr)          mina::assert_(expr, #expr)
+#define mina_assert_msg(expr, msg) mina::assert_(expr, #expr, msg)
 
     // -------------------------------------------------------------------------------------------------
     // Utility types.
@@ -296,7 +290,8 @@ namespace mina {
             if (size != 0) {
                 mina_assert_msg(
                     buf != nullptr,
-                    "FatPtr constructed with inconsistent data: non-zero length but null buffer");
+                    "FatPtr constructed with inconsistent data: non-zero length but null "
+                    "buffer");
             }
         }
 
