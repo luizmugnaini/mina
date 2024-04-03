@@ -29,8 +29,7 @@ void correct_sizes() {
     static_assert(sizeof(FxROMBank::CartHeader) == 0x0050);
 
     static_assert(sizeof(VideoRAM::TileRAM) == 0x1800);
-    static_assert(sizeof(VideoRAM::TileMap) == 0x0400);
-    static_assert(sizeof(VideoRAM::TileAttr) == 0x0400);
+    static_assert(sizeof(VideoRAM::TileMap) == 0x0800);
 
     static_assert(sizeof(FxROMBank) == 0x4000);
     static_assert(sizeof(SwROMBank) == 0x4000);
