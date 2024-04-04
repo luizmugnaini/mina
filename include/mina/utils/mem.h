@@ -28,6 +28,14 @@ namespace mina {
         return 1 << n;
     }
 
+    constexpr u32 clear_bit(u32 n) noexcept {
+        return ~(1u << n);
+    }
+
+    constexpr u16 to_high_u16(u8 b) {
+        return static_cast<u16>(b << 8);
+    }
+
     constexpr u8 addr_middle_byte(BusAddr addr) noexcept {
         return (addr >> 4) & 0xff;
     }

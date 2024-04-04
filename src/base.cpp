@@ -20,7 +20,7 @@ namespace mina {
 #endif
     }
 
-    void assert_(bool expr_res, StrPtr expr_str, StrPtr msg, LogInfo const& info) {
+    void assert_(bool expr_res, StrPtr expr_str, StrPtr msg, LogInfo&& info) noexcept {
 #if !defined(MINA_DISABLE_ASSERTS)
         if (!expr_res) {
             log_fmt(info, "Assertion failed: %s, msg: %s", expr_str, msg);

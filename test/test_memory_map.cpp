@@ -2,6 +2,7 @@
 ///
 /// Author: Luiz G. Mugnaini A. <luizmugnaini@gmail.com>
 
+#include <mina/base.h>
 #include <mina/memory_map.h>
 
 using namespace mina;

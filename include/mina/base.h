@@ -41,6 +41,12 @@ namespace mina {
     concept Integral = std::is_integral_v<T>;
 
     template <typename T>
+    concept Signed = std::is_signed_v<T>;
+
+    template <typename T>
+    concept Unsigned = std::is_unsigned_v<T>;
+
+    template <typename T>
     concept Numeric = std::is_integral_v<T> || std::is_floating_point_v<T>;
 
     template <typename T>
@@ -186,9 +192,11 @@ namespace mina {
         assert(char_count >= 0 && "std::snptrintf unable to parse the format string and arguments");
 
         // Stamp the message with a null-terminator.
-        usize const msg_size =
-            char_count < max_msg_size ? static_cast<usize>(char_count) : max_msg_size;
-        msg[msg_size] = 0;
+        {
+            auto const uchar_count = static_cast<usize>(char_count);
+            auto const msg_size    = uchar_count < max_msg_size ? uchar_count : max_msg_size;
+            msg[msg_size]          = 0;
+        }
 
         mina_unused(std::fprintf(
             stderr,
@@ -207,11 +215,18 @@ namespace mina {
     // This will make assertions evaluate the given expression and throw away its result.
     // -------------------------------------------------------------------------------------------------
 
-    void assert_(
-        bool      expr_res,
-        StrPtr    expr_str,
-        StrPtr    msg  = "",
-        LogInfo&& info = LogInfo{LogLevel::Fatal}) noexcept;
+    inline void assert_(
+        bool           expr_res,
+        StrPtr         expr_str,
+        StrPtr         msg  = "",
+        LogInfo const& info = LogInfo{LogLevel::Fatal}) {
+#if !defined(MINA_DISABLE_ASSERTS)
+        if (!expr_res) {
+            log_fmt(info, "Assertion failed: %s, msg: %s", expr_str, msg);
+            std::abort();
+        }
+#endif
+    }
 
 #define mina_assert(expr)          mina::assert_(expr, #expr)
 #define mina_assert_msg(expr, msg) mina::assert_(expr, #expr, msg)

@@ -1,7 +1,6 @@
 # ------------------------------------------------------------------------------
 # Project description
 # ------------------------------------------------------------------------------
-
 cmake_minimum_required(VERSION 3.22)
 
 project(
@@ -10,13 +9,9 @@ project(
     LANGUAGES CXX C
 )
 
-# ---- Compilation config ----
-
-message(STATUS "C Compiler executable: ${CMAKE_C_COMPILER}")
-message(STATUS "CXX Compiler executable: ${CMAKE_CXX_COMPILER}")
-message(STATUS "Linker executable: ${CMAKE_LINKER}")
-
-# - Compilation options for the codebase -
+# ------------------------------------------------------------------------------
+# Codebase compilation options
+# ------------------------------------------------------------------------------
 
 option(MINA_DISABLE_LOGGING "Compile without logging" OFF)
 option(MINA_DISABLE_ASSERTS "Compile without asserts" OFF)
@@ -25,18 +20,6 @@ option(MINA_DEBUG "Compile in debug mode" ON)
 option(MINA_CHECK_BOUNDS "Compile with bound check" ON)
 option(MINA_CHECK_MEMCPY_OVERLAP "Checks if memcpy is called with overlapping regions of memory" ON)
 option(MINA_ENABLE_VULKAN_VALIDATION_LAYERS "Enable Vulkan validation layers" ON)
-
-# ------------------------------------------------------------------------------
-# Misc.
-# ------------------------------------------------------------------------------
-
-if(CMAKE_BUILD_TYPE STREQUAL "Debug")
-    message(STATUS "Enabling tests")
-    enable_testing()
-endif()
-
-# Enable Clangd LSP integration with the project
-set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
 # ------------------------------------------------------------------------------
 # Compiler info
@@ -117,14 +100,11 @@ endif()
 # ------------------------------------------------------------------------------
 
 if(CMAKE_CXX_COMPILER_ID STREQUAL "Clang")
-    # ---- Clang-tidy integration ----
+    # Enable Clangd LSP integration with the project
+    set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
-    option(USE_TIDY "Use the clang-tidy tool for linting" OFF)
-    if(USE_TIDY)
-        set(CMAKE_CXX_CLANG_TIDY "clang-tidy" "--config-file=${CMAKE_SOURCE_DIR}/.clang-tidy")
-    endif()
+        # ---- Compilation flags ----
 
-    if(UNIX)
         set(
             MINA_CXX_FLAGS
             "-std=c++20"
@@ -162,6 +142,9 @@ if(CMAKE_CXX_COMPILER_ID STREQUAL "Clang")
             "-fcolor-diagnostics"     # Enable colors in the diagnostics.
             "-fno-force-emit-vtables" # Disable forcing vtables for modules where it isn't necessary.
         )
+
+        # ---- Sanitizer flags ----
+
         set(
             MINA_CXX_SAN_FLAGS
             "-fsanitize=address"           # - Enable AddressSanitizer, a fast memory error detector.
@@ -184,9 +167,11 @@ if(CMAKE_CXX_COMPILER_ID STREQUAL "Clang")
             "-fsanitize=leak"              # - Enable LeakSanitizer, a memory leak detector. This option only
                                            #   matters for linking of executables.
         )
-    elseif(MSVC)
-        # Flags for the clang-cl compiler (see https://clang.llvm.org/docs/UsersManual.html#clang-cl).
-        message(STATUS "Using MSVC-like compiler flags")
+    endif()
+
+    # ---- Clang with MSVC backend (Clang-CL) ----
+
+    if(MSVC)
         set(
             MINA_CXX_FLAGS
             "/std:c++20"
@@ -226,6 +211,7 @@ if(CMAKE_CXX_COMPILER_ID STREQUAL "Clang")
     endif() # MSVC Clang
 endif() # Clang
 
+<<<<<<< HEAD
 # ------------------------------------------------------------------------------
 # MSVC configuration
 # ------------------------------------------------------------------------------
@@ -258,6 +244,28 @@ if(MSVC)
                 "/Ob2"  # Inline functions as deemed beneficial by the compiler.
             )
         endif()
+
+        # ---- Sanitizer flags ----
+
+        set(MINA_CXX_SAN_FLAGS "")  # TODO: Enable ASan and UBSan
+
+    endif() # MSVC Clang
+endif() # Clang
+
+# ------------------------------------------------------------------------------
+# MSVC configuration
+# ------------------------------------------------------------------------------
+
+if(CMAKE_CXX_COMPILER_ID STREQUAL "MSVC")
+    set(
+        MINA_CXX_FLAGS
+        "/std:c++20"
+        "/W3"
+        "/EHc"  # Extern "C" defaults to nothrow.
+        "/GA"   # Optimize for Windows applications.
+        "/GR-"  # Disable RTTI information
+    )
+    set(MINA_CXX_SAN_FLAGS "")
 endif()
 
 # ------------------------------------------------------------------------------
@@ -269,34 +277,38 @@ if(UNIX)
 elseif(MSVC)
     set(DEFINE_MACRO "/D")
 
-     # Says that fopen is unsafe... cringe
-    set(MINA_CXX_FLAGS "${MINA_CXX_FLAGS}" "${DEFINE_MACRO}_CRT_SECURE_NO_WARNINGS")
+    # MSVC says that fopen is unsafe... cringe
+    set(MINA_CXX_FLAGS ${MINA_CXX_FLAGS} "${DEFINE_MACRO}_CRT_SECURE_NO_WARNINGS")
 endif()
 
 if(MINA_DEBUG)
-    set(MINA_CXX_FLAGS "${MINA_CXX_FLAGS}" "${DEFINE_MACRO}MINA_DEBUG")
+    set(MINA_CXX_FLAGS ${MINA_CXX_FLAGS} "${DEFINE_MACRO}MINA_DEBUG")
 endif()
 if(MINA_CHECK_BOUNDS)
-    set(MINA_CXX_FLAGS "${MINA_CXX_FLAGS}" "${DEFINE_MACRO}MINA_CHECK_BOUNDS")
+    set(MINA_CXX_FLAGS ${MINA_CXX_FLAGS} "${DEFINE_MACRO}MINA_CHECK_BOUNDS")
 endif()
 if(MINA_MEMCPY_OVERLAP)
-    set(MINA_CXX_FLAGS "${MINA_CXX_FLAGS}" "${DEFINE_MACRO}MINA_MEMCPY_OVERLAP")
+    set(MINA_CXX_FLAGS ${MINA_CXX_FLAGS} "${DEFINE_MACRO}MINA_MEMCPY_OVERLAP")
 endif()
 if(MINA_CHECK_SHADER_COMPILATION)
-    set(MINA_CXX_FLAGS "${MINA_CXX_FLAGS}" "${DEFINE_MACRO}MINA_CHECK_SHADER_COMPILATION")
+    set(MINA_CXX_FLAGS ${MINA_CXX_FLAGS} "${DEFINE_MACRO}MINA_CHECK_SHADER_COMPILATION")
 endif()
 if(MINA_CHECK_PROGRAM_LINKING)
-    set(MINA_CXX_FLAGS "${MINA_CXX_FLAGS}" "${DEFINE_MACRO}MINA_CHECK_PROGRAM_LINKING")
+    set(MINA_CXX_FLAGS ${MINA_CXX_FLAGS} "${DEFINE_MACRO}MINA_CHECK_PROGRAM_LINKING")
 endif()
 if(MINA_DISABLE_LOGGING)
-    set(MINA_CXX_FLAGS "${MINA_CXX_FLAGS}" "${DEFINE_MACRO}MINA_DISABLE_LOGGING")
+    set(MINA_CXX_FLAGS ${MINA_CXX_FLAGS} "${DEFINE_MACRO}MINA_DISABLE_LOGGING")
 endif()
 if(MINA_DISABLE_ASSERTS)
-    set(MINA_CXX_FLAGS "${MINA_CXX_FLAGS}" "${DEFINE_MACRO}MINA_DISABLE_ASSERTS")
+    set(MINA_CXX_FLAGS ${MINA_CXX_FLAGS} "${DEFINE_MACRO}MINA_DISABLE_ASSERTS")
 endif()
 
+# ------------------------------------------------------------------------------
+# Inform the resulting compiler and sanitizer flags
+# ------------------------------------------------------------------------------
+
 message(STATUS "Mina C++ compiler flags: ${MINA_CXX_FLAGS}")
-message(STATUS "Mina C++ linker flags: ${MINA_CXX_SAN_FLAGS}")
+message(STATUS "Mina C++ sanitizer flags: ${MINA_CXX_SAN_FLAGS}")
 
 # ------------------------------------------------------------------------------
 # Third-party dependencies

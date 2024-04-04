@@ -35,6 +35,13 @@ namespace mina {
         return (lhs <= rhs) ? lhs : rhs;
     }
 
+    /// Specialized minimum value of unsigned integers without branching.
+    template <typename T>
+        requires std::is_unsigned_v<T> && std::is_integral_v<T>
+    constexpr T min(T lhs, T rhs) noexcept {
+        return rhs ^ ((lhs ^ rhs) & -(lhs < rhs));
+    }
+
     /// Maximum between two elements that admit a partial order.
     ///
     /// Return: `lhs` if `lhs` is greater than or equal to `rhs`, otherwise returns `rhs`.
@@ -42,6 +49,13 @@ namespace mina {
         requires PartiallyOrdered<T> && TriviallyCopyable<T>
     constexpr T max(T lhs, T rhs) noexcept {
         return (lhs >= rhs) ? lhs : rhs;
+    }
+
+    /// Specialized maximum value of unsigned integers without branching.
+    template <typename T>
+        requires std::is_unsigned_v<T> && Integral<T>
+    constexpr T max(T lhs, T rhs) noexcept {
+        return lhs ^ ((lhs ^ rhs) & -(lhs < rhs));
     }
 
     /// Checks if a given number is a power of two.

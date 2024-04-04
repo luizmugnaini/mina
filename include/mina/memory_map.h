@@ -694,5 +694,9 @@ namespace mina {
         HwRegisterBank   reg{};
         HighRAM          hram{};
         InterruptEnable  ie{};
+
+        u8 bus_read(u16 addr) {
+            return *(reinterpret_cast<u8*>(this) + addr);
+        }
     };
 }  // namespace mina
