@@ -1,4 +1,7 @@
-# ---- Project description ----
+# ------------------------------------------------------------------------------
+# Project description
+# ------------------------------------------------------------------------------
+
 cmake_minimum_required(VERSION 3.22)
 
 project(
@@ -23,21 +26,105 @@ option(MINA_CHECK_BOUNDS "Compile with bound check" ON)
 option(MINA_CHECK_MEMCPY_OVERLAP "Checks if memcpy is called with overlapping regions of memory" ON)
 option(MINA_ENABLE_VULKAN_VALIDATION_LAYERS "Enable Vulkan validation layers" ON)
 
-# - Compilation flags -
-# Supported compilers: clang, clang-cl, MSCV, gcc.
+# ------------------------------------------------------------------------------
+# Misc.
+# ------------------------------------------------------------------------------
+
+if(CMAKE_BUILD_TYPE STREQUAL "Debug")
+    message(STATUS "Enabling tests")
+    enable_testing()
+endif()
+
+# Enable Clangd LSP integration with the project
+set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
+
+# ------------------------------------------------------------------------------
+# Compiler info
+# ------------------------------------------------------------------------------
+
+message(STATUS "C Compiler executable: ${CMAKE_C_COMPILER}")
+message(STATUS "CXX Compiler executable: ${CMAKE_CXX_COMPILER}")
+message(STATUS "Linker executable: ${CMAKE_LINKER}")
+
+# ------------------------------------------------------------------------------
+# GCC configuration
+# ------------------------------------------------------------------------------
+
+if (CMAKE_CXX_COMPILER_ID STREQUAL "GCC")
+    set(
+        MINA_CXX_FLAGS
+        "-std=c++20"
+        "-Wall"
+        "-Wextra"
+        "-pedantic"
+        "-Wuninitialized"
+        "-Wswitch"
+        "-Wcovered-switch-default"
+        "-Wshadow"             # Warn the user if a variable declaration shadows a parent variable.
+        "-Wnon-virtual-dtor"   # Warn the user if a class with virtual functions has a
+                               # Non-virtual destructor. This helps catch hard to
+                               # Track down memory errors.
+        "-Wold-style-cast"     # Warn for c-style casts.
+        "-Wcast-align"         # Warn for potential performance problem casts.
+        "-Wunused"             # Warn on anything being unused.
+        "-Woverloaded-virtual" # Warn if you overload (not override) a virtual
+                               # Function.
+        "-Wpedantic"           # Warn if non-standard C++ is used.
+        "-Wconversion"         # Warn on type conversions that may lose data.
+        "-Wsign-conversion"    # Warn on sign conversions.
+        "-Wnull-dereference"   # Warn if a null dereference is detected.
+        "-Wdouble-promotion"   # Warn if float is implicit promoted to double.
+        "-Wmisleading-indentation" # Warn if indentation implies blocks where blocks
+                                   # do not exist.
+
+        # Don't warn about non-literal format strings.
+        # TODO: we should use -Wformat=2
+        # "-Wno-format-security"
+        # "-Wno-format-nonliteral"
+
+        "-fno-rtti"               # Disable runtime type inference.
+        "-fno-exceptions"         # Disable exceptions.
+        "-fno-cxx-exceptions"     # Disable exceptions.
+        "-fcolor-diagnostics"     # Enable colors in the diagnostics.
+        "-fno-force-emit-vtables" # Disable forcing vtables for modules where it isn't necessary.
+    )
+    set(
+        MINA_CXX_SAN_FLAGS
+        "-fsanitize=address"           # - Enable AddressSanitizer, a fast memory error detector.
+                                       #   Memory access instructions are instrumented to detect
+                                       #   out-of-bounds and use-after-free bugs. The option
+                                       #   enables -fsanitize-address-use-after-scope.
+        "-fsanitize=pointer-compare"   # - Instrument comparison operation (<, <=, >, >=) with
+                                       #   pointer operands. The option must be combined with
+                                       #   either -fsanitize=kernel-address or -fsanitize=address
+        "-fsanitize=pointer-subtract"  # - Instrument subtraction with pointer operands.
+                                       #   The option must be combined with either
+                                       #   -fsanitize=kernel-address or -fsanitize=address.
+        "-fsanitize=shadow-call-stack" # - Enable ShadowCallStack, a security enhancement
+                                       #   mechanism used to protect programs against return
+                                       #   address overwrites (e.g. stack buffer overflows.)
+        "-fsanitize=undefined"         # - Enable UndefinedBehaviorSanitizer.
+        "-fstack-protector-strong"     # - Like -fstack-protector but includes additional functions
+                                       #   to be protected — those that have local array definitions,
+                                       #   or have references to local frame addresses.
+        "-fsanitize=leak"              # - Enable LeakSanitizer, a memory leak detector. This option only
+                                       #   matters for linking of executables.
+    )
+endif()
+
+# ------------------------------------------------------------------------------
+# Clang configuration
+# ------------------------------------------------------------------------------
 
 if(CMAKE_CXX_COMPILER_ID STREQUAL "Clang")
-    # Enable clangd LSP integration with the project
-    set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
+    # ---- Clang-tidy integration ----
 
-    # clang-tidy integration
     option(USE_TIDY "Use the clang-tidy tool for linting" OFF)
     if(USE_TIDY)
         set(CMAKE_CXX_CLANG_TIDY "clang-tidy" "--config-file=${CMAKE_SOURCE_DIR}/.clang-tidy")
     endif()
 
     if(UNIX)
-        # Flags for the clang compiler
         set(
             MINA_CXX_FLAGS
             "-std=c++20"
@@ -135,7 +222,28 @@ if(CMAKE_CXX_COMPILER_ID STREQUAL "Clang")
             "-Wno-format-security"
             "-Wno-format-nonliteral"
         )
+        set(MINA_CXX_SAN_FLAGS "")  # TODO: Enable ASan and UBSan
+    endif() # MSVC Clang
+endif() # Clang
 
+# ------------------------------------------------------------------------------
+# MSVC configuration
+# ------------------------------------------------------------------------------
+
+if(CMAKE_CXX_COMPILER_ID STREQUAL "MSVC")
+    set(
+        MINA_CXX_FLAGS
+        "/std:c++20"
+        "/W3"
+        "/EHc"  # Extern "C" defaults to nothrow.
+        "/GA"   # Optimize for Windows applications.
+        "/GR-"  # Disable RTTI information
+    )
+    set(MINA_CXX_SAN_FLAGS "")
+endif()
+
+if(MSVC)
+    # Set debug/release flags for MSVC and Clang-cl
         if(CMAKE_BUILD_TYPE STREQUAL "Debug")
             message(STATUS "Compiling with debug flags")
             set(
@@ -150,27 +258,11 @@ if(CMAKE_CXX_COMPILER_ID STREQUAL "Clang")
                 "/Ob2"  # Inline functions as deemed beneficial by the compiler.
             )
         endif()
-
-
-        set(MINA_CXX_SAN_FLAGS "")  # TODO: Enable ASan and UBSan
-    endif()
 endif()
 
-# - Flags for the MSVC compiler -
-
-if(CMAKE_CXX_COMPILER_ID STREQUAL "MSVC")
-    set(
-        MINA_CXX_FLAGS
-        "/std:c++20"
-        "/W3"
-        "/EHc"  # Extern "C" defaults to nothrow.
-        "/GA"   # Optimize for Windows applications.
-        "/GR-"  # Disable RTTI information
-    )
-    set(MINA_CXX_SAN_FLAGS "")
-endif()
-
-# - Define macros -
+# ------------------------------------------------------------------------------
+# Set the codebase options as compiler flags with -D or /D
+# ------------------------------------------------------------------------------
 
 if(UNIX)
     set(DEFINE_MACRO "-D")
@@ -206,7 +298,9 @@ endif()
 message(STATUS "Mina C++ compiler flags: ${MINA_CXX_FLAGS}")
 message(STATUS "Mina C++ linker flags: ${MINA_CXX_SAN_FLAGS}")
 
-# ---- Third-party dependencies ----
+# ------------------------------------------------------------------------------
+# Third-party dependencies
+# ------------------------------------------------------------------------------
 
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/bin")
 option(BUILD_SHARED_LIBS "Build shared libraries" OFF)
@@ -225,7 +319,9 @@ set(GLFW_BUILD_DOCS OFF)
 set(GLFW_BUILD_WAYLAND OFF)  # TODO: support wayland
 add_subdirectory("${THIRDPARTY_DIR}/glfw")
 
-# ---- Source Files ----
+# ------------------------------------------------------------------------------
+# Source files
+# ------------------------------------------------------------------------------
 
 set(
     MINA_ENGINE_SRC
@@ -238,6 +334,10 @@ set(
     "${CMAKE_SOURCE_DIR}/src/main.cpp"
 )
 
+# ------------------------------------------------------------------------------
+# Mina main binary and library
+# ------------------------------------------------------------------------------
+
 add_executable(mina ${MINA_EXE_SRC} ${MINA_ENGINE_SRC})
 target_compile_options(mina PUBLIC ${MINA_CXX_FLAGS} ${MINA_CXX_SAN_FLAGS})
 target_link_libraries(mina PUBLIC ${MINA_CXX_SAN_FLAGS} Vulkan::Vulkan glfw)
@@ -248,7 +348,9 @@ target_compile_options(mina_lib PUBLIC ${MINA_CXX_FLAGS} ${MINA_CXX_SAN_FLAGS})
 target_link_libraries(mina_lib PUBLIC ${MINA_CXX_SAN_FLAGS} Vulkan::Vulkan glfw)
 target_include_directories(mina_lib PUBLIC "${CMAKE_SOURCE_DIR}/include")
 
-# ---- Tests ----
+# ------------------------------------------------------------------------------
+# Mina library tests
+# ------------------------------------------------------------------------------
 
 list(
     APPEND TESTS
