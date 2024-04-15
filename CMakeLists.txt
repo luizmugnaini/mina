@@ -325,7 +325,7 @@ add_subdirectory("${THIRDPARTY_DIR}/glfw")
 
 set(
     MINA_ENGINE_SRC
-    # Utilities
+    "${CMAKE_SOURCE_DIR}/src/base.cpp"
     "${CMAKE_SOURCE_DIR}/src/utils/mem.cpp"
 )
 

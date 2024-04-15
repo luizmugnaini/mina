@@ -24,7 +24,6 @@
 #include <cassert>
 #include <cstdint>
 #include <cstdio>
-#include <cstdlib>
 #include <type_traits>
 
 namespace mina {
@@ -103,14 +102,21 @@ namespace mina {
         usize const  len;
 
         template <usize N>
-        consteval StringLiteral(char const (&_str)[N]) : str{_str}, len{N} {}
+        consteval StringLiteral(char const (&_str)[N]) noexcept : str{_str}, len{N} {}
 
         StringLiteral(StringLiteral&)       = delete;
         StringLiteral(StringLiteral const&) = delete;
     };
 
+// -------------------------------------------------------------------------------------------------
+// Miscellaneous useful macros.
+// -------------------------------------------------------------------------------------------------
+
 /// Simple macro casting an unused result from a function call.
 #define mina_unused(x) (void)x
+
+/// Given a symbol, transform it into its string representation.
+#define mina_symb_to_str(symb) #symb
 
     // -------------------------------------------------------------------------------------------------
     // Logging functionality of the engine.
@@ -139,11 +145,11 @@ namespace mina {
         consteval LogInfo(
             LogLevel _lvl,
             StrPtr   _file = __builtin_FILE(),
-            u32      _line = __builtin_LINE())
+            u32      _line = __builtin_LINE()) noexcept
             : file{_file}, line{_line}, lvl{_lvl} {}
     };
 
-    constexpr StrPtr log_level_str(LogLevel level) {
+    constexpr StrPtr log_level_str(LogLevel level) noexcept {
         switch (level) {
             case LogLevel::Fatal:
                 return "\x1b[1;41m[FATAL]\x1b[0m";
@@ -158,6 +164,8 @@ namespace mina {
         }
     }
 
+    [[noreturn]] void abort_program() noexcept;
+
     /// Write a message to the standard error stream.
     ///
     /// Parameters:
@@ -165,17 +173,7 @@ namespace mina {
     ///     * line: Current line number of the source file of the caller.
     ///     * level: The level associated to the log message.
     ///     * msg: Log message to be displayed.
-    inline void log(LogInfo&& info, StrPtr msg) noexcept {
-#if !defined(MINA_DISABLE_LOGGING)
-        (void)std::fprintf(
-            stderr,
-            "%s [%s:%d] %s\n",
-            log_level_str(info.lvl),
-            info.file,
-            info.line,
-            msg);
-#endif
-    }
+    void log(LogInfo&& info, StrPtr msg) noexcept;
 
     template <typename... Arg>
     void log_fmt(LogInfo const& info, StringLiteral&& fmt, Arg const&... args) noexcept {
@@ -192,13 +190,13 @@ namespace mina {
             char_count < max_msg_size ? static_cast<usize>(char_count) : max_msg_size;
         msg[msg_size] = 0;
 
-        (void)std::fprintf(
+        mina_unused(std::fprintf(
             stderr,
             "%s [%s:%d] %s\n",
             log_level_str(info.lvl),
             info.file,
             info.line,
-            msg);
+            msg));
 #endif
     }
 
@@ -209,21 +207,20 @@ namespace mina {
     // This will make assertions evaluate the given expression and throw away its result.
     // -------------------------------------------------------------------------------------------------
 
-    inline void assert_(
-        bool           expr_res,
-        StrPtr         expr_str,
-        StrPtr         msg  = "",
-        LogInfo const& info = LogLevel{LogLevel::Fatal}) {
-#if !defined(MINA_DISABLE_ASSERTS)
-        if (!expr_res) {
-            log_fmt(info, "Assertion failed: %s, msg: %s", expr_str, msg);
-            std::abort();
-        }
-#endif
-    }
+    void assert_(
+        bool      expr_res,
+        StrPtr    expr_str,
+        StrPtr    msg  = "",
+        LogInfo&& info = LogInfo{LogLevel::Fatal}) noexcept;
 
 #define mina_assert(expr)          mina::assert_(expr, #expr)
 #define mina_assert_msg(expr, msg) mina::assert_(expr, #expr, msg)
+
+#define mina_unreachable()                                                   \
+    {                                                                        \
+        mina::log(mina::LogLevel::Fatal, "Codepath should be unreachable!"); \
+        mina::abort_program();                                               \
+    }
 
     // -------------------------------------------------------------------------------------------------
     // Utility types.
