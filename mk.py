@@ -3,7 +3,7 @@ Python build script for interacting with CMake and other development tools.
 
 Run `python mk.py --help` for further instructions on how to use the script.
 
-Author: Luiz G. Mugnaini A. <luizmugnaini@gmail.com>
+Author: Luiz Gustavo Mugnaini Anselmo <luizmugnaini@gmail.com>
 """
 
 import argparse
@@ -41,24 +41,23 @@ CURRENT_C_COMPILER = os_choose(POSIX_C_COMPILER, WIN_C_COMPILER)
 CURRENT_LINKER = os_choose(POSIX_LINKER, WIN_LINKER)
 
 
-def cmake_flags():
-    return [
-        f"-G={CURRENT_BUILDER}",
-        f"-DCMAKE_CXX_COMPILER={CURRENT_CPP_COMPILER}",
-        f"-DCMAKE_C_COMPILER={CURRENT_C_COMPILER}",
-        f"-DCMAKE_EXE_LINKER_FLAGS='-fuse-ld={CURRENT_LINKER}'",
-        f"-DCMAKE_SHARED_LINKER_FLAGS='-fuse-ld={CURRENT_LINKER}'",
-    ]
-
-
-DEBUG_FLAGS = ["-DCMAKE_BUILD_TYPE=Debug", "-DMINA_DEBUG=On"]
-RELEASE_FLAGS = [
-    "-DMINA_DISABLE_ASSERTS=On",
-    "-DMINA_DISABLE_LOGGINGS=On",
-    "-DMINA_DEBUG=Off",
+CMAKE_FLAGS = [
+    f"-G={CURRENT_BUILDER}",
+    f"-DCMAKE_CXX_COMPILER={CURRENT_CPP_COMPILER}",
+    f"-DCMAKE_C_COMPILER={CURRENT_C_COMPILER}",
 ]
 
-TIDY_FLAG = "-DUSE_TIDY=ON"
+if CURRENT_LINKER == "mold":
+    CMAKE_FLAGS.extend(
+        [
+            f"-DCMAKE_EXE_LINKER_FLAGS='-fuse-ld={CURRENT_LINKER}'",
+            f"-DCMAKE_SHARED_LINKER_FLAGS='-fuse-ld={CURRENT_LINKER}'",
+        ]
+    )
+
+
+DEBUG_FLAGS = ["-DCMAKE_BUILD_TYPE=Debug", "-DGAME_DEBUG=On"]
+RELEASE_FLAGS = ["-DCMAKE_BUILD_TYPE=Release", "-DGAME_DEBUG=Off"]
 
 CPP_SRC_EXTENSION = ".cpp"
 CPP_HEADER_EXTENSION = ".h"
@@ -73,9 +72,10 @@ CMAKE_CACHE_PATH = BUILD_DIR / "CMakeCache.txt"
 
 DEPENDENCIES = [
     {"name": "glfw", "url": "https://github.com/glfw/glfw.git"},
+    {"name": "presheaf", "url": "https://github.com/luizmugnaini/presheaf.git"},
 ]
 
-EMU_BIN_NAME = "mina"
+MINA_BIN_NAME = "mina"
 
 SCRIPT_INDICATOR = "\x1b[1;35m[mk]\x1b[0m"
 
@@ -117,7 +117,7 @@ def run_tests(pattern: str | None = None):
     n_tests = len(tests)
 
     for idx, test in enumerate(tests):
-        log_info(f"\x1b[1;33m[test {idx + 1}/{n_tests}]\x1b[0m: {test}...")
+        log_info(f"\n\x1b[1;33m[test {idx + 1}/{n_tests}]\x1b[0m: {test}...")
         run_bin(test)
 
 
@@ -149,6 +149,7 @@ def command_clean():
     header("Removing existing build directory")
     try:
         shutil.rmtree("./build")
+
     except OSError as e:
         log_error(
             f"Unable to remove build directory due to error: [{e.filename}] {e.strerror}"
@@ -177,7 +178,7 @@ def command_build(build_flags: list[str] = []):
         sp_run(
             [
                 "cmake",
-                *cmake_flags(),
+                *CMAKE_FLAGS,
                 *build_flags,
                 "-S",
                 ".",
@@ -190,11 +191,11 @@ def command_build(build_flags: list[str] = []):
     sp_run(["cmake", "--build", str(BUILD_DIR)])
 
 
-def command_run_game():
+def command_run_mina():
     command_build()
 
     header("Running game")
-    sp_run([str(BIN_DIR / EMU_BIN_NAME)])
+    sp_run([str(BIN_DIR / MINA_BIN_NAME)])
 
 
 def command_test(pattern: str):
@@ -235,11 +236,6 @@ parser.add_argument(
     const="debug",
     default=None,
     help="Build the project (default: %(default)s)",
-)
-parser.add_argument(
-    "--tidy-build",
-    action="store_true",
-    help="Build the project in debug mode with Clang-Tidy enabled",
 )
 parser.add_argument(
     "-r", "--run", action="store_true", help="Build and run the project binary"
@@ -283,8 +279,6 @@ if args.clean:
     command_clean()
 if args.clear_cache:
     command_clear_cache()
-if args.tidy_build:
-    command_build(build_flags=[*DEBUG_FLAGS, TIDY_FLAG])
 if args.build is not None:
     match args.build:
         case "debug":
@@ -292,6 +286,6 @@ if args.build is not None:
         case "release":
             command_build(build_flags=RELEASE_FLAGS)
 if args.run:
-    command_run_game()
+    command_run_mina()
 if args.test is not None:
     command_test(args.test)

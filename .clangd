@@ -1,0 +1,21 @@
+CompileFlags:
+  CompilationDatabase: build/
+
+Diagnostics:
+  ClangTidy:
+    Add: 
+      - 'cert-*'
+      - 'clang-analyzer-*'
+      - 'concurrency-*'
+      - 'misc-*'
+      - 'performance-*'
+      - 'portability-*'
+      - 'modernize-*'
+      - readability-braces-around-statements
+    Remove: 
+      - cert-dcl50-cpp
+      - modernize-use-trailing-return-type
+      - modernize-avoid-c-arrays
+      - modernize-use-nodiscard
+      - misc-non-private-member-variables-in-classes
+      - misc-use-anonymous-namespace

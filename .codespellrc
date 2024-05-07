@@ -1,2 +1,2 @@
 [codespell]
-skip=./build,thirdparty
+skip=build,thirdparty,ignore
