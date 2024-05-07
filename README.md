@@ -13,6 +13,9 @@ The Presheaf game engine development requires the following dependencies to be i
 
 Additionally, the following dependencies are vendored with the engine:
 
+- [Presheaf](https://github.com/luizmugnaini/presheaf) alternative to C++ STL (git submodule).
+- [VulkanMemoryAllocator](https://github.com/GPUOpen-LibrariesAndSDKs/VulkanMemoryAllocator)
+  GPU allocation layer for Vulkan (git submodule).
 - [GLFW](https://www.glfw.org/) for windowing and input handling (cloned in build).
 
 ## Development
