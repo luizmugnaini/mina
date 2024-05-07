@@ -23,7 +23,6 @@
 
 #include <mina/cpu/dmg_reg.h>
 #include <mina/memory_map.h>
-
 #include <psh/math.h>
 #include <psh/mem_utils.h>
 #include <psh/types.h>

@@ -16,17 +16,25 @@
 ///    51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
 ///
 ///
-/// Description: Starting point for the Mina Emulator.
+/// Description: Game Boy emulator instance.
 /// Author: Luiz G. Mugnaini A. <luizmuganini@gmail.com>
 
-#include <mina/gb.h>
-#include <psh/io.h>
+#pragma once
 
-int main() {
-#if defined(MINA_VULKAN_DEBUG)
-    psh::log(psh::LogLevel::Info, "Hello, Mina emulator!");
-#endif
-    mina::GameBoy gb{};
-    gb.run();
-    return 0;
-}
+#include <mina/gfx/context.h>
+#include <psh/arena.h>
+#include <psh/memory_manager.h>
+
+namespace mina {
+    struct GameBoy {
+        psh::MemoryManager   memory_manager;
+        psh::Arena           persistent_arena;
+        psh::Arena           frame_arena;
+        psh::Arena           work_arena;
+        gfx::GraphicsContext graphics_context;
+
+        GameBoy() noexcept;
+        ~GameBoy() noexcept;
+        void run() noexcept;
+    };
+}  // namespace mina

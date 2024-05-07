@@ -16,17 +16,16 @@
 ///    51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
 ///
 ///
-/// Description: Starting point for the Mina Emulator.
+/// Description: GPU buffer management.
 /// Author: Luiz G. Mugnaini A. <luizmuganini@gmail.com>
 
-#include <mina/gb.h>
-#include <psh/io.h>
+#pragma once
 
-int main() {
-#if defined(MINA_VULKAN_DEBUG)
-    psh::log(psh::LogLevel::Info, "Hello, Mina emulator!");
-#endif
-    mina::GameBoy gb{};
-    gb.run();
-    return 0;
-}
+#include <mina/gfx/context.h>
+#include <vulkan/vulkan_core.h>
+
+namespace mina::gfx {
+    void make_gpu_buffers(MakeGPUBuffersInfo const& buf_info, GraphicsContext& ctx) noexcept;
+
+    void transfer_host_data(GraphicsContext& ctx) noexcept;
+}  // namespace mina::gfx

@@ -16,17 +16,32 @@
 ///    51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
 ///
 ///
-/// Description: Starting point for the Mina Emulator.
+/// Description: Vulkan graphics swap chain management layer.
 /// Author: Luiz G. Mugnaini A. <luizmuganini@gmail.com>
 
-#include <mina/gb.h>
-#include <psh/io.h>
+#pragma once
 
-int main() {
-#if defined(MINA_VULKAN_DEBUG)
-    psh::log(psh::LogLevel::Info, "Hello, Mina emulator!");
-#endif
-    mina::GameBoy gb{};
-    gb.run();
-    return 0;
-}
+#include <mina/gfx/context.h>
+#include <psh/arena.h>
+#include <psh/types.h>
+#include <vulkan/vulkan_core.h>
+
+namespace mina::gfx {
+    void query_swap_chain_info(
+        psh::Arena*      arena,
+        VkPhysicalDevice pdev,
+        VkSurfaceKHR     surf,
+        SwapChainInfo&   swc_info) noexcept;
+
+    void create_swap_chain(SwapChainInfo const& swc_info, GraphicsContext& ctx) noexcept;
+
+    void create_image_views(GraphicsContext& ctx) noexcept;
+
+    void create_frame_buffers(GraphicsContext& ctx) noexcept;
+
+    [[nodiscard]] bool prepare_frame_for_rendering(GraphicsContext& ctx) noexcept;
+
+    [[nodiscard]] bool present_frame(GraphicsContext& ctx) noexcept;
+
+    void destroy_swap_chain(GraphicsContext& ctx) noexcept;
+}  // namespace mina::gfx

@@ -56,8 +56,16 @@ if CURRENT_LINKER == "mold":
     )
 
 
-DEBUG_FLAGS = ["-DCMAKE_BUILD_TYPE=Debug", "-DMINA_DEBUG=On"]
-RELEASE_FLAGS = ["-DCMAKE_BUILD_TYPE=Release", "-DMINA_DEBUG=Off"]
+DEBUG_FLAGS = [
+    "-DCMAKE_BUILD_TYPE=Debug",
+    "-DMINA_DEBUG=On",
+    "-DMINA_VULKAN_DEBUG=On",
+]
+RELEASE_FLAGS = [
+    "-DCMAKE_BUILD_TYPE=Release",
+    "-DMINA_DEBUG=Off",
+    "-DMINA_VULKAN_DEBUG=Off",
+]
 
 CPP_SRC_EXTENSION = ".cc"
 CPP_HEADER_EXTENSION = ".h"
@@ -71,8 +79,18 @@ BIN_DIR = BUILD_DIR / "bin"
 CMAKE_CACHE_PATH = BUILD_DIR / "CMakeCache.txt"
 
 DEPENDENCIES = [
-    {"name": "glfw", "url": "https://github.com/glfw/glfw.git"},
-    {"name": "presheaf", "url": "https://github.com/luizmugnaini/presheaf.git"},
+    {
+        "name": "glfw",
+        "url": "https://github.com/glfw/glfw.git",
+    },
+    {
+        "name": "presheaf",
+        "url": "https://github.com/luizmugnaini/presheaf.git",
+    },
+    {
+        "name": "VulkanMemoryAllocator",
+        "url": "https://github.com/luizmugnaini/VulkanMemoryAllocator.git",
+    },
 ]
 
 MINA_BIN_NAME = "mina"

@@ -23,8 +23,7 @@
 
 #include <psh/assert.h>
 
-// TODO: Separate instructions from the cpu. This allows for a very fast execution of instructions
-//       that only depend on a single index lookup to a buffer.
+// TODO: detach behaviour from the CPU struct so that we can pass references instead of pointers.
 
 namespace mina::dmg {
     static void add_hl_r16(CPU* cpu, Reg16 reg) noexcept {
@@ -72,6 +71,21 @@ namespace mina::dmg {
         cpu->reg.set_flag_if(Flag::C, res > 0x00FF);
         cpu->reg.set_flag_if(Flag::H, ((acc & 0x0F) + (val & 0x0F) + carry) > 0x0F);
         cpu->reg.set_flag_if(Flag::Z, res == 0);
+    }
+
+    u8 CPU::cycle_read(u16) noexcept {
+        psh_todo();
+        return 0;
+    }
+
+    u8 CPU::read_imm8() noexcept {
+        psh_todo();
+        return 0;
+    }
+
+    u16 CPU::read_imm16() noexcept {
+        psh_todo();
+        return 0;
     }
 
     void CPU::dexec(u16 instr) noexcept {

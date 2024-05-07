@@ -23,8 +23,8 @@ message(STATUS "Linker executable:       ${CMAKE_LINKER}")
 # You can assign to these options via `-D[OPTION NAME]=[On/Off]`.
 # ------------------------------------------------------------------------------
 
-option(MINA_DEBUG                           "Enable all debugging resources"       ON)
-option(MINA_ENABLE_VULKAN_VALIDATION_LAYERS "Enable Vulkan validation layers"     OFF)
+option(MINA_DEBUG        "Enable all debugging resources"  ON)
+option(MINA_VULKAN_DEBUG "Enable Vulkan validation layers" ON)
 
 # ------------------------------------------------------------------------------
 # Tooling integration
@@ -47,7 +47,7 @@ set(MINA_CXX_SAN_FLAGS)  # Holds the resulting sanitizer flags for the build
 list(
     APPEND MINA_OPTIONS
         MINA_DEBUG
-        MINA_ENABLE_VULKAN_VALIDATION_LAYERS
+        MINA_VULKAN_DEBUG
 )
 
 if(UNIX)
@@ -255,6 +255,11 @@ set(THIRDPARTY_DIR "${CMAKE_SOURCE_DIR}/thirdparty")
 
 find_package(Vulkan REQUIRED)
 
+# - VulkanMemoryAllocator -
+
+add_library(VulkanMemoryAllocator INTERFACE)
+target_include_directories(VulkanMemoryAllocator INTERFACE "${THIRDPARTY_DIR}/VulkanMemoryAllocator/include")
+
 # - GLFW -
 
 set(GLFW_BUILD_TESTS   OFF)
@@ -278,12 +283,53 @@ add_subdirectory("${THIRDPARTY_DIR}/presheaf")
 
 set(
     MINA_ENGINE_SRC
+    "${CMAKE_SOURCE_DIR}/src/gb.cc"
     "${CMAKE_SOURCE_DIR}/src/cpu/dmg.cc"
+    "${CMAKE_SOURCE_DIR}/src/gfx/command.cc"
+    "${CMAKE_SOURCE_DIR}/src/gfx/context.cc"
+    "${CMAKE_SOURCE_DIR}/src/gfx/gpu_buffer.cc"
+    "${CMAKE_SOURCE_DIR}/src/gfx/pipeline.cc"
+    "${CMAKE_SOURCE_DIR}/src/gfx/swap_chain.cc"
+    "${CMAKE_SOURCE_DIR}/src/gfx/sync.cc"
+    "${CMAKE_SOURCE_DIR}/src/gfx/utils.cc"
+    "${CMAKE_SOURCE_DIR}/src/gfx/vma.cc"
+    "${CMAKE_SOURCE_DIR}/src/gfx/window.cc"
 )
 
+set(MINA_EXE_SRC "${CMAKE_SOURCE_DIR}/src/main.cc")
+
 set(
-    MINA_EXE_SRC
-    "${CMAKE_SOURCE_DIR}/src/main.cc"
+    MINA_SHADER_SOURCES
+    "${CMAKE_SOURCE_DIR}/src/shaders/triangle.vert"
+    "${CMAKE_SOURCE_DIR}/src/shaders/triangle.frag"
+)
+
+# ------------------------------------------------------------------------------
+# Shader compilation to SPIR-V
+# ------------------------------------------------------------------------------
+
+set(SHADER_COMPILE_COMMANDS)
+set(SHADER_BINARIES)
+
+foreach(SHADER_SRC ${MINA_SHADER_SOURCES})
+    get_filename_component(SHADER_NAME ${SHADER_SRC} NAME)
+    set(SPIRV_OUT "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/${SHADER_NAME}.spv")
+
+    list(APPEND SHADER_COMPILE_COMMANDS COMMAND)
+    list(APPEND SHADER_COMPILE_COMMANDS Vulkan::glslc)
+    list(APPEND SHADER_COMPILE_COMMANDS "${SHADER_SRC}")
+    list(APPEND SHADER_COMPILE_COMMANDS "-o")
+    list(APPEND SHADER_COMPILE_COMMANDS "${SPIRV_OUT}")
+
+    list(APPEND SHADER_BINARIES "${SPIRV_OUT}")
+endforeach()
+
+add_custom_target(
+    compshaders ALL
+    ${SHADER_COMPILE_COMMANDS}
+    COMMENT "Compiling shaders to SPIR-V bytecode"
+    SOURCES ${GAME_SHADER_SOURCES}
+    BYPRODUCTS ${SHADER_BINARIES}
 )
 
 # ------------------------------------------------------------------------------
@@ -292,12 +338,19 @@ set(
 
 add_library(mina_lib ${MINA_ENGINE_SRC})
 target_compile_options(mina_lib PUBLIC ${MINA_CXX_FLAGS} ${MINA_CXX_SAN_FLAGS})
-target_link_libraries(mina_lib PUBLIC ${MINA_CXX_SAN_FLAGS} presheaf)
+target_link_libraries(mina_lib PUBLIC ${MINA_CXX_SAN_FLAGS} Vulkan::Vulkan VulkanMemoryAllocator glfw presheaf)
 target_include_directories(mina_lib PUBLIC "${CMAKE_SOURCE_DIR}/include")
 
-add_executable(mina ${MINA_EXE_SRC})
+add_executable(mina ${MINA_EXE_SRC} ${MINA_ENGINE_SRC})
 target_compile_options(mina PUBLIC ${MINA_CXX_FLAGS} ${MINA_CXX_SAN_FLAGS})
-target_link_libraries(mina PUBLIC ${MINA_CXX_SAN_FLAGS} Vulkan::Vulkan glfw presheaf)
+target_link_libraries(
+    mina 
+    PUBLIC ${MINA_CXX_SAN_FLAGS}
+        Vulkan::Vulkan
+        VulkanMemoryAllocator
+        glfw
+        presheaf
+)
 target_include_directories(mina PUBLIC "${CMAKE_SOURCE_DIR}/include")
 
 # ------------------------------------------------------------------------------

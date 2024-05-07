@@ -16,17 +16,20 @@
 ///    51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
 ///
 ///
-/// Description: Starting point for the Mina Emulator.
+/// Description: Metadata about the Mina emulator.
 /// Author: Luiz G. Mugnaini A. <luizmuganini@gmail.com>
 
-#include <mina/gb.h>
-#include <psh/io.h>
+#pragma once
 
-int main() {
-#if defined(MINA_VULKAN_DEBUG)
-    psh::log(psh::LogLevel::Info, "Hello, Mina emulator!");
-#endif
-    mina::GameBoy gb{};
-    gb.run();
-    return 0;
-}
+#include <psh/types.h>
+
+#define MINA_VULKAN_API_VERSION VK_API_VERSION_1_3
+#define MINA_VMA_VULKAN_VERSION 1003000
+
+namespace mina {
+    [[maybe_unused]] constexpr StrPtr EMU_NAME      = "Mina Game Boy Emulator";
+    [[maybe_unused]] constexpr StrPtr ENGINE_NAME   = "Mina";
+    [[maybe_unused]] constexpr u32    MAJOR_VERSION = 0;
+    [[maybe_unused]] constexpr u32    MINOR_VERSION = 0;
+    [[maybe_unused]] constexpr u32    PATCH_VERSION = 1;
+}  // namespace mina
