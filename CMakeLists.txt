@@ -276,31 +276,29 @@ add_subdirectory("${THIRDPARTY_DIR}/presheaf")
 # Source files
 # ------------------------------------------------------------------------------
 
-
 set(
     MINA_ENGINE_SRC
-    "${CMAKE_SOURCE_DIR}/src/base.cpp"
-    "${CMAKE_SOURCE_DIR}/src/utils/mem.cpp"
+    "${CMAKE_SOURCE_DIR}/src/cpu/dmg.cc"
 )
 
 set(
     MINA_EXE_SRC
-    "${CMAKE_SOURCE_DIR}/src/main.cpp"
+    "${CMAKE_SOURCE_DIR}/src/main.cc"
 )
 
 # ------------------------------------------------------------------------------
 # Mina main binary and library
 # ------------------------------------------------------------------------------
 
-add_executable(mina ${MINA_EXE_SRC} ${MINA_ENGINE_SRC})
-target_compile_options(mina PUBLIC ${MINA_CXX_FLAGS} ${MINA_CXX_SAN_FLAGS})
-target_link_libraries(mina PUBLIC ${MINA_CXX_SAN_FLAGS} Vulkan::Vulkan glfw)
-target_include_directories(mina PUBLIC "${CMAKE_SOURCE_DIR}/include")
-
 add_library(mina_lib ${MINA_ENGINE_SRC})
 target_compile_options(mina_lib PUBLIC ${MINA_CXX_FLAGS} ${MINA_CXX_SAN_FLAGS})
-target_link_libraries(mina_lib PUBLIC ${MINA_CXX_SAN_FLAGS} Vulkan::Vulkan glfw)
+target_link_libraries(mina_lib PUBLIC ${MINA_CXX_SAN_FLAGS} presheaf)
 target_include_directories(mina_lib PUBLIC "${CMAKE_SOURCE_DIR}/include")
+
+add_executable(mina ${MINA_EXE_SRC})
+target_compile_options(mina PUBLIC ${MINA_CXX_FLAGS} ${MINA_CXX_SAN_FLAGS})
+target_link_libraries(mina PUBLIC ${MINA_CXX_SAN_FLAGS} Vulkan::Vulkan glfw presheaf)
+target_include_directories(mina PUBLIC "${CMAKE_SOURCE_DIR}/include")
 
 # ------------------------------------------------------------------------------
 # Mina library tests
@@ -312,7 +310,7 @@ list(
 )
 
 foreach(t IN LISTS TESTS)
-    add_executable(${t} "${CMAKE_SOURCE_DIR}/test/${t}.cpp")
+    add_executable(${t} "${CMAKE_SOURCE_DIR}/test/${t}.cc")
     target_compile_options(${t} PRIVATE ${COMMON_CXX_FLAGS})
     target_link_libraries(${t} PUBLIC mina_lib)
 endforeach()

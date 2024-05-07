@@ -21,9 +21,10 @@
 
 #pragma once
 
-#include <mina/base.h>
 #include <mina/memory_map.h>
-#include <mina/utils/mem.h>
+
+#include <psh/mem_utils.h>
+#include <psh/types.h>
 
 namespace mina::dmg {
     /// 8-bit registers.
@@ -111,28 +112,28 @@ namespace mina::dmg {
         constexpr void set_flag_if(Flag f, bool cond) {
             auto const icond = static_cast<i32>(cond);
             switch (f) {
-                case (Flag::C): af ^= ((-icond ^ af) & bit(4)); break;
-                case (Flag::H): af ^= ((-icond ^ af) & bit(5)); break;
-                case (Flag::N): af ^= ((-icond ^ af) & bit(6)); break;
-                case (Flag::Z): af ^= ((-icond ^ af) & bit(7)); break;
+                case (Flag::C): af ^= ((-icond ^ af) & psh::bit(4)); break;
+                case (Flag::H): af ^= ((-icond ^ af) & psh::bit(5)); break;
+                case (Flag::N): af ^= ((-icond ^ af) & psh::bit(6)); break;
+                case (Flag::Z): af ^= ((-icond ^ af) & psh::bit(7)); break;
             }
         }
 
         constexpr void set_flag(Flag f) {
             switch (f) {
-                case (Flag::C): af |= bit(4); break;
-                case (Flag::H): af |= bit(5); break;
-                case (Flag::N): af |= bit(6); break;
-                case (Flag::Z): af |= bit(7); break;
+                case (Flag::C): af |= psh::bit(4); break;
+                case (Flag::H): af |= psh::bit(5); break;
+                case (Flag::N): af |= psh::bit(6); break;
+                case (Flag::Z): af |= psh::bit(7); break;
             }
         }
 
         constexpr void clear_flag(Flag f) {
             switch (f) {
-                case (Flag::C): af &= clear_bit(4); break;
-                case (Flag::H): af &= clear_bit(5); break;
-                case (Flag::N): af &= clear_bit(6); break;
-                case (Flag::Z): af &= clear_bit(7); break;
+                case (Flag::C): af &= psh::clear_bit(4); break;
+                case (Flag::H): af &= psh::clear_bit(5); break;
+                case (Flag::N): af &= psh::clear_bit(6); break;
+                case (Flag::Z): af &= psh::clear_bit(7); break;
             }
         }
     };

@@ -21,6 +21,8 @@
 
 #include <mina/cpu/dmg.h>
 
+#include <psh/assert.h>
+
 // TODO: Separate instructions from the cpu. This allows for a very fast execution of instructions
 //       that only depend on a single index lookup to a buffer.
 
@@ -40,7 +42,7 @@ namespace mina::dmg {
         u8 const acc = reg.acc();
 
         u16 const res = acc + val;
-        reg.af        = to_high_u16(static_cast<u8>(res));  // All flags clear.
+        reg.af        = psh::as_high_u16(static_cast<u8>(res));  // All flags clear.
 
         reg.set_flag_if(Flag::C, res > 0x00FF);
         reg.set_flag_if(Flag::H, ((acc & 0x0F) + (val & 0x0F)) > 0x0F);
@@ -49,7 +51,7 @@ namespace mina::dmg {
 
     void CPU::add_sp_e8(i8 offset) noexcept {
         auto const res = static_cast<u16>(
-            lb_add(static_cast<i16>(reg.sp), static_cast<i16>(offset), static_cast<i16>(0)));
+            psh::lb_add(static_cast<i16>(reg.sp), static_cast<i16>(offset), static_cast<i16>(0)));
         reg.sp = res;
 
         reg.af &= 0xFF00;  // Clear all flags.
@@ -62,7 +64,7 @@ namespace mina::dmg {
         u8 const carry = reg.flag(Flag::C);
 
         u16 const res = acc + val + carry;
-        reg.af        = to_high_u16(static_cast<u8>(res));  // All flags clear.
+        reg.af        = psh::as_high_u16(static_cast<u8>(res));  // All flags clear.
 
         reg.set_flag_if(Flag::C, res > 0x00FF);
         reg.set_flag_if(Flag::H, ((acc & 0x0F) + (val & 0x0F) + carry) > 0x0F);
@@ -171,7 +173,7 @@ namespace mina::dmg {
                 adc(read_imm8());
                 break;
             }
-            default: mina_unreachable();
+            default: psh_unreachable();
         }
     }
 }  // namespace mina::dmg

@@ -18,9 +18,9 @@
 ///
 /// Description: Starting point for the Mina Emulator.
 /// Author: Luiz G. Mugnaini A. <luizmuganini@gmail.com>
-#include <mina/base.h>
+#include <psh/io.h>
 
 int main() {
-    mina::log(mina::LogLevel::Info, "Hello, Mina emulator!");
+    psh::log(psh::LogLevel::Info, "Hello, Mina emulator!");
     return 0;
 }

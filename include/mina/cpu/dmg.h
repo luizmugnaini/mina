@@ -21,11 +21,12 @@
 
 #pragma once
 
-#include <mina/base.h>
 #include <mina/cpu/dmg_reg.h>
 #include <mina/memory_map.h>
-#include <mina/utils/math.h>
-#include <mina/utils/mem.h>
+
+#include <psh/math.h>
+#include <psh/mem_utils.h>
+#include <psh/types.h>
 
 namespace mina::dmg {
     /// Conditional execution.

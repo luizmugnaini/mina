@@ -21,8 +21,8 @@
 
 #pragma once
 
-#include <mina/base.h>
-#include <mina/utils/mem.h>
+#include <psh/mem_utils.h>
+#include <psh/types.h>
 
 namespace mina {
     struct MemoryRange {
@@ -233,8 +233,8 @@ namespace mina {
             /// The index of a tile equals the middle nibbles of the address.
             ///
             /// Example: if `0x8872` is the address of the tile, then its index is `0x87`
-            [[nodiscard]] static constexpr u8 unsigned_idx(BusAddr addr) noexcept {
-                return addr_middle_byte(addr);
+            [[nodiscard]] static constexpr u8 unsigned_idx(u16 addr) noexcept {
+                return (addr >> 4) & 0xff;
             }
         };
 
