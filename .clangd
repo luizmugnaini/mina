@@ -11,7 +11,6 @@ Diagnostics:
       - 'performance-*'
       - 'portability-*'
       - 'modernize-*'
-      - readability-braces-around-statements
     Remove: 
       - cert-dcl50-cpp
       - modernize-use-trailing-return-type

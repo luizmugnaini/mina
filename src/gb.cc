@@ -24,38 +24,106 @@
 #include <mina/gfx/context.h>
 #include <mina/gfx/pipeline.h>
 #include <mina/gfx/swap_chain.h>
+#include <mina/meta/info.h>
 
 namespace mina {
+    // Implementation details of the game boy struct.
+    namespace {
+        [[nodiscard]] psh::FileStatus load_rom(GameBoy* gb, psh::StringView cart_path) noexcept {
+            psh::FileStatus cart_valid = gb->cart.init(&gb->rom_arena, cart_path);
+            return cart_valid;
+        }
+
+        psh::Buffer<char, 11> extract_cart_title(GameBoy* gb) noexcept {
+            constexpr MemoryRange TITLE     = gb->cpu.mmap.fx_rom.header.GAME_TITLE;
+            constexpr usize TITLE_FIRST_IDX = TITLE.start - gb->cpu.mmap.fx_rom.header.RANGE.start;
+
+            psh::Buffer<char, 11> buf{};
+            for (u16 idx = 0; idx < 11; ++idx) {
+                char const cr =
+                    static_cast<char>(gb->cpu.mmap.fx_rom.header.buf[TITLE_FIRST_IDX + idx]);
+                if (!psh::is_utf8(cr)) {
+                    break;
+                }
+                buf[idx] = cr;
+            }
+            return buf;
+        }
+    }  // namespace
+
     GameBoy::GameBoy() noexcept {
-        memory_manager.init(204800);
-        persistent_arena =
-            memory_manager.make_arena(51200).demand("Unable to create persistent arena");
-        frame_arena = memory_manager.make_arena(10240).demand("Unable to create frame arena");
-        work_arena  = memory_manager.make_arena(131072).demand("Unable to create work arena");
+        memory_manager.init(psh_mebibytes(64));
+
+        // Initialize arenas.
+        rom_arena =
+            memory_manager.make_arena(psh_mebibytes(8)).demand("Unable to create ROM arena");
+        gfx_arena = memory_manager.make_arena(psh_mebibytes(20))
+                        .demand("Unable to create persistent arena");
+        frame_arena =
+            memory_manager.make_arena(psh_mebibytes(18)).demand("Unable to create frame arena");
+        work_arena =
+            memory_manager.make_arena(psh_mebibytes(17)).demand("Unable to create work arena");
+
         gfx::init_graphics_context(
+            graphics_context,
             gfx::GraphicsContextConfig{
-                .persistent_arena = &persistent_arena,
+                .persistent_arena = &gfx_arena,
                 .work_arena       = &work_arena,
                 .win_config{
                     .user_pointer = this,
                 },
-            },
-            graphics_context);
+            });
     }
 
     GameBoy::~GameBoy() noexcept {
         gfx::destroy_graphics_context(graphics_context);
     }
 
-    void GameBoy::run() noexcept {
+    void GameBoy::run(psh::StringView cart_path) noexcept {
         graphics_context.window.show();
+
+        switch (load_rom(this, cart_path)) {
+            case psh::FileStatus::OK: {
+                psh::log(psh::LogLevel::Info, "Cartridge data successfully loaded.");
+                break;
+            }
+            case psh::FileStatus::OutOfMemory: {
+                psh::log(psh::LogLevel::Fatal, "Not enough memory to read the cartridge data.");
+                return;
+            }
+            default: {
+                psh::log(psh::LogLevel::Fatal, "Unable to read cartridge data.");
+                return;
+            }
+        }
+
+        cpu.mmap.fixed_rom_bank_transfer(cart);
+        // TODO(luiz): transfer the remaining memory regions.
+
+        // Try to update the window title.
+        {
+            auto const  cart_title = extract_cart_title(this);
+            psh::String win_title{&work_arena, cart_title.size() + EMU_NAME.size()};
+            psh::Status res = win_title.join(
+                {
+                    psh::StringView{EMU_NAME.buf, EMU_NAME.size()},
+                    psh::StringView{cart_title.buf, cart_title.size()},
+                },
+                " - ");
+            if (res == psh::Status::OK) {
+                graphics_context.window.set_title(win_title.data.buf);
+            } else {
+                graphics_context.window.set_title(EMU_NAME.buf);
+            }
+        }
+
         while (!graphics_context.window.should_close()) {
             graphics_context.window.poll_events();
-            if (!gfx::prepare_frame_for_rendering(graphics_context)) {
-                continue;
+            if (psh_likely(gfx::prepare_frame_for_rendering(graphics_context))) {
+                gfx::submit_graphics_commands(graphics_context);
+                psh_assert(gfx::present_frame(graphics_context));
             }
-            gfx::submit_graphics_commands(graphics_context);
-            psh_assert(gfx::present_frame(graphics_context));
+            cpu.run_cycle();
         }
     }
 }  // namespace mina

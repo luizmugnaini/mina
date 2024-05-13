@@ -24,6 +24,7 @@
 #include <mina/gfx/vma.h>
 #include <psh/array.h>
 #include <psh/buffer.h>
+#include <psh/dyn_array.h>
 #include <psh/fat_ptr.h>
 #include <vulkan/vulkan_core.h>
 
@@ -100,8 +101,22 @@ namespace mina::gfx {
         u32     transfer_idx;
         u32     present_idx;
 
-        [[nodiscard]] inline psh::FatPtr<u32 const> indices() const {
-            return psh::FatPtr{&this->graphics_idx, 3ull};
+        inline psh::FatPtr<u32 const> indices() const {
+            return psh::FatPtr{&this->graphics_idx, 3};
+        }
+
+        inline psh::DynArray<u32> unique_indices(psh::Arena* arena) const {
+            psh::DynArray<u32> uidx{arena, 3};
+            uidx.push(graphics_idx);
+            if (transfer_idx != graphics_idx) {
+                uidx.push(transfer_idx);
+            }
+            if (psh_unlikely(present_idx != graphics_idx)) {
+                if (present_idx != transfer_idx) {
+                    uidx.push(present_idx);
+                }
+            }
+            return uidx;
         }
     };
 

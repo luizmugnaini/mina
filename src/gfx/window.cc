@@ -26,7 +26,7 @@
 #include <psh/types.h>
 
 namespace mina::gfx {
-    static void glfw_error_callback(i32 error_code, StrPtr desc) {
+    static void glfw_error_callback(i32 error_code, strptr desc) {
         psh::log_fmt(
             psh::LogLevel::Error,
             "[GLFW] error code: %d, description: %s",
@@ -74,7 +74,7 @@ namespace mina::gfx {
             }
 
             // Initialize the window.
-            handle = glfwCreateWindow(width, height, EMU_NAME, nullptr, nullptr);
+            handle = glfwCreateWindow(width, height, EMU_NAME.buf, nullptr, nullptr);
             psh_assert_msg(handle != nullptr, "Unable to create the window.");
 
             // Compute and set the window position.
@@ -138,5 +138,9 @@ namespace mina::gfx {
     void Window::poll_events() noexcept {
         glfwPollEvents();
         this->update_extent();
+    }
+
+    void Window::set_title(strptr title) noexcept {
+        glfwSetWindowTitle(handle, title);
     }
 }  // namespace mina::gfx

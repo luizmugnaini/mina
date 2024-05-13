@@ -4,6 +4,7 @@
 /ignore*
 
 /thirdparty/glfw
+/thirdparty/VulkanMemoryAllocator
 
 # Renderdoc
 *.cap

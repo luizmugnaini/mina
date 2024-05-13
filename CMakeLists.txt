@@ -271,8 +271,10 @@ add_subdirectory("${THIRDPARTY_DIR}/glfw")
 
 if(CMAKE_BUILD_TYPE STREQUAL "Debug")
     set(PSH_DEBUG ON)
+    set(PSH_ENABLE_LOGGING ON)
 elseif(CMAKE_BUILD_TYPE STREQUAL "Release")
     set(PSH_DEBUG OFF)
+    set(PSH_ENABLE_LOGGING OFF)
 endif()
 set(PSH_NAMESPACED_TYPES OFF)
 add_subdirectory("${THIRDPARTY_DIR}/presheaf")
@@ -284,6 +286,8 @@ add_subdirectory("${THIRDPARTY_DIR}/presheaf")
 set(
     MINA_ENGINE_SRC
     "${CMAKE_SOURCE_DIR}/src/gb.cc"
+    "${CMAKE_SOURCE_DIR}/src/cart.cc"
+    "${CMAKE_SOURCE_DIR}/src/memory_map.cc"
     "${CMAKE_SOURCE_DIR}/src/cpu/dmg.cc"
     "${CMAKE_SOURCE_DIR}/src/gfx/command.cc"
     "${CMAKE_SOURCE_DIR}/src/gfx/context.cc"

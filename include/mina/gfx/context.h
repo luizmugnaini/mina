@@ -66,7 +66,7 @@ namespace mina::gfx {
     };
 
     /// Initialize the graphics context instance according to the given configurations.
-    void init_graphics_context(GraphicsContextConfig const& config, GraphicsContext& ctx) noexcept;
+    void init_graphics_context(GraphicsContext& ctx, GraphicsContextConfig const& config) noexcept;
 
     /// Destroy all resources attached and managed by the graphics context.
     void destroy_graphics_context(GraphicsContext& ctx) noexcept;

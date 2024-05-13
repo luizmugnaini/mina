@@ -21,6 +21,7 @@
 
 #pragma once
 
+#include <mina/cart.h>
 #include <psh/mem_utils.h>
 #include <psh/types.h>
 
@@ -29,10 +30,10 @@ namespace mina {
         usize const start;  ///< Inclusive start address.
         usize const end;    ///< Inclusive end address.
 
-        constexpr MemoryRange(usize _min, usize _max) noexcept : start{_min}, end{_max} {}
-        constexpr MemoryRange(usize min_max) noexcept : start{min_max}, end{min_max} {}
+        constexpr MemoryRange(usize start, usize end) noexcept : start{start}, end{end} {}
+        constexpr MemoryRange(usize start_end) noexcept : start{start_end}, end{start_end} {}
 
-        [[nodiscard]] constexpr usize size() const noexcept {
+        constexpr usize size() const noexcept {
             return end - (start - 1);
         }
     };
@@ -223,17 +224,17 @@ namespace mina {
             /// Tiles 0 to 127 in signed mode.
             u8 block_2[BLOCK_2.size()]{};
 
-            [[nodiscard]] constexpr u8* unsigned_mode_base_ptr() noexcept {
+            constexpr u8* unsigned_mode_base_ptr() noexcept {
                 return &block_0[0];
             }
-            [[nodiscard]] constexpr u8* signed_mode_base_ptr() noexcept {
+            constexpr u8* signed_mode_base_ptr() noexcept {
                 return &block_2[0];
             }
 
             /// The index of a tile equals the middle nibbles of the address.
             ///
             /// Example: if `0x8872` is the address of the tile, then its index is `0x87`
-            [[nodiscard]] static constexpr u8 unsigned_idx(u16 addr) noexcept {
+            static constexpr u8 unsigned_idx(u16 addr) noexcept {
                 return (addr >> 4) & 0xff;
             }
         };
@@ -695,8 +696,7 @@ namespace mina {
         HighRAM          hram{};
         InterruptEnable  ie{};
 
-        u8 bus_read(u16 addr) {
-            return *(reinterpret_cast<u8*>(this) + addr);
-        }
+        u8*  memstart() noexcept;
+        void fixed_rom_bank_transfer(GbCart const& cart) noexcept;
     };
 }  // namespace mina

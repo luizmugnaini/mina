@@ -22,11 +22,11 @@
 #include <mina/gb.h>
 #include <psh/io.h>
 
+#include <cstdlib>
+
+// TODO: accept path from input instead of hard-coding it.
 int main() {
-#if defined(MINA_VULKAN_DEBUG)
-    psh::log(psh::LogLevel::Info, "Hello, Mina emulator!");
-#endif
     mina::GameBoy gb{};
-    gb.run();
-    return 0;
+    gb.run(psh_string_view("ignore/roms/drmario.gb"));
+    return EXIT_SUCCESS;
 }

@@ -33,7 +33,7 @@ namespace mina::gfx {
         VkSurfaceKHR     surf,
         SwapChainInfo&   swc_info) noexcept;
 
-    void create_swap_chain(SwapChainInfo const& swc_info, GraphicsContext& ctx) noexcept;
+    void create_swap_chain(GraphicsContext& ctx, SwapChainInfo const& swc_info) noexcept;
 
     void create_image_views(GraphicsContext& ctx) noexcept;
 

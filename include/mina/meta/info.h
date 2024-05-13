@@ -21,15 +21,16 @@
 
 #pragma once
 
+#include <psh/string.h>
 #include <psh/types.h>
 
 #define MINA_VULKAN_API_VERSION VK_API_VERSION_1_3
 #define MINA_VMA_VULKAN_VERSION 1003000
 
 namespace mina {
-    [[maybe_unused]] constexpr StrPtr EMU_NAME      = "Mina Game Boy Emulator";
-    [[maybe_unused]] constexpr StrPtr ENGINE_NAME   = "Mina";
-    [[maybe_unused]] constexpr u32    MAJOR_VERSION = 0;
-    [[maybe_unused]] constexpr u32    MINOR_VERSION = 0;
-    [[maybe_unused]] constexpr u32    PATCH_VERSION = 1;
+    [[maybe_unused]] constexpr auto EMU_NAME      = psh_str("Mina Game Boy Emulator");
+    [[maybe_unused]] constexpr auto ENGINE_NAME   = psh_str("Mina");
+    [[maybe_unused]] constexpr u32  MAJOR_VERSION = 0;
+    [[maybe_unused]] constexpr u32  MINOR_VERSION = 0;
+    [[maybe_unused]] constexpr u32  PATCH_VERSION = 1;
 }  // namespace mina

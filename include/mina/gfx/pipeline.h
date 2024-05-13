@@ -22,6 +22,7 @@
 #pragma once
 
 #include <mina/gfx/context.h>
+#include <psh/string.h>
 #include <psh/types.h>
 
 namespace mina::gfx {
@@ -31,14 +32,16 @@ namespace mina::gfx {
         ShaderCatalogCount,
     };
 
-    constexpr StrPtr shader_path(ShaderCatalog s) noexcept {
-        StrPtr path;
+    constexpr strptr shader_path(ShaderCatalog s) noexcept {
         switch (s) {
-            case ShaderCatalog::TriangleVertex:   path = "build/bin/triangle.vert.spv"; break;
-            case ShaderCatalog::TriangleFragment: path = "build/bin/triangle.frag.spv"; break;
-            default:                              psh_unreachable();
+            case ShaderCatalog::TriangleVertex: {
+                return "build/bin/triangle.vert.spv";
+            }
+            case ShaderCatalog::TriangleFragment: {
+                return "build/bin/triangle.frag.spv";
+            }
+            default: psh_unreachable();
         }
-        return path;
     }
 
     void create_graphics_pipeline(GraphicsContext& ctx) noexcept;

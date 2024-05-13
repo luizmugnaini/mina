@@ -21,13 +21,74 @@
 
 #pragma once
 
-#include <mina/cpu/dmg_reg.h>
 #include <mina/memory_map.h>
 #include <psh/math.h>
 #include <psh/mem_utils.h>
+#include <psh/option.h>
 #include <psh/types.h>
 
 namespace mina::dmg {
+    /// 8-bit registers.
+    enum class Reg8 : u8 {
+        B = 0,
+        C,
+        D,
+        E,
+        H,
+        L,
+        A,
+    };
+
+    /// 16-bit registers.
+    enum class Reg16 : u8 {
+        BC = 0,
+        DE,
+        HL,
+        SP,
+    };
+
+    enum class Flag : u8 {
+        /// The carry flag. Set in the following occasions:
+        ///     * 8-bit addition is higher than 0xFF.
+        ///     * 16-bit addition is higher than 0xFFFF.
+        ///     * Result of subtraction or comparison is negative.
+        ///     * If a shift operation shifts out a 0b1 valued bit.
+        C,
+        H,  ///< Indicates carry for the high nibble.
+        N,  ///< If the last operation was a subtraction.
+        Z,  ///< If the last operation result was zero.
+    };
+
+    struct CPURegisters {
+        u16 af = 0x0000;  ///< Hi: accumulator, Lo: flag.
+        u16 bc = 0x0000;  ///< Hi: B, Lo: C.
+        u16 de = 0x0000;  ///< Hi: D, Lo: E.
+        u16 hl = 0x0000;  ///< Hi: H, Lo: L.
+        u16 sp = 0x0000;  ///< Stack Pointer.
+        u16 pc = 0x0000;  ///< Program counter.
+
+        /// Read the value of the 8-bit accumulator register.
+        u8 acc() const;
+
+        /// Read the value of the 8-bit register.
+        u8 read(Reg8 r) const;
+
+        /// Read the value of a 16-bit register.
+        u16 read(Reg16 r) const;
+
+        /// Read the value of a flag.
+        u8 flag(Flag f) const;
+
+        /// Set a given flag.
+        void set_flag(Flag f);
+
+        /// Clear a given flag.
+        void clear_flag(Flag f);
+
+        /// Set a given flag a certain condition is satisfied, otherwise, clear the flag.
+        void set_or_clear_flag_if(Flag f, bool cond);
+    };
+
     /// Conditional execution.
     ///
     /// Execute the instruction if the corresponding register flag is set.
@@ -40,11 +101,11 @@ namespace mina::dmg {
 
     /// 3-bit unsigned integer constant.
     struct UConst3 {
-        u8 val    : 3 = 0b000;
-        u8 unused : 5;
+        u8 val     : 3 = 0b000;
+        u8 unused_ : 5;
     };
 
-    enum class Opcode {
+    enum class Opcode : u8 {
         Nop                 = 0x00,
         LD_bc_u16           = 0x01,
         LD_bc_ptr_a         = 0x02,
@@ -309,21 +370,18 @@ namespace mina::dmg {
     /// The DMG is an SoC containing a Sharp SM83 CPU, which is based on the Zilog Z80 and
     /// Intel 8080.
     struct CPU {
-        MemoryMap    mem{};
         CPURegisters reg{};
+        MemoryMap    mmap{};
+        u16          bus_addr = 0x0000;
+        u16          clock    = 0x0000;
 
-        void run();
-
-        /// Read the address in a cycle.
-        u8 cycle_read(u16 addr) noexcept;
-
-        /// Read immediate 8-bit value.
-        u8 read_imm8() noexcept;
-
-        /// Read immediate 16-bit value.
-        u16 read_imm16() noexcept;
+        u8  bus_read_byte(u16 addr) noexcept;
+        u8  bus_read_imm8() noexcept;
+        u16 bus_read_imm16() noexcept;
 
         /// Decode and execute an instruction.
-        void dexec(u16 instr) noexcept;
+        void dexec(u8 data) noexcept;
+
+        void run_cycle() noexcept;
     };
 }  // namespace mina::dmg

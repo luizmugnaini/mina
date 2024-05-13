@@ -23,12 +23,101 @@
 
 #include <mina/gfx/utils.h>
 #include <psh/buffer.h>
+#include <psh/intrinsics.h>
 #include <psh/mem_utils.h>
-#include <psh/set.h>
 #include <vulkan/vulkan_core.h>
 
 namespace mina::gfx {
-    constexpr u64 NEXT_IMAGE_TIMEOUT = UINT64_MAX;
+    namespace {
+        constexpr u64 NEXT_IMAGE_TIMEOUT = UINT64_MAX;
+
+        // Does the same as `create_image_views` but without initializing the image and image view
+        // arrays, simply reusing and overriding their memory.
+        void recreate_image_views(GraphicsContext& ctx) noexcept {
+            u32 img_count = static_cast<u32>(ctx.swap_chain.img.size);
+
+            vkGetSwapchainImagesKHR(
+                ctx.dev,
+                ctx.swap_chain.handle,
+                &img_count,
+                ctx.swap_chain.img.buf);
+
+            VkImageViewCreateInfo img_info{
+                .sType    = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO,
+                .viewType = VK_IMAGE_VIEW_TYPE_2D,
+                .format   = ctx.swap_chain.surf_fmt.format,
+                .components =
+                    VkComponentMapping{
+                        .r = VK_COMPONENT_SWIZZLE_IDENTITY,
+                        .g = VK_COMPONENT_SWIZZLE_IDENTITY,
+                        .b = VK_COMPONENT_SWIZZLE_IDENTITY,
+                        .a = VK_COMPONENT_SWIZZLE_IDENTITY,
+                    },
+                .subresourceRange =
+                    VkImageSubresourceRange{
+                        .aspectMask     = VK_IMAGE_ASPECT_COLOR_BIT,
+                        .baseMipLevel   = 0,
+                        .levelCount     = 1,
+                        .baseArrayLayer = 0,
+                        .layerCount     = 1,
+                    },
+            };
+
+            for (u32 idx = 0; idx < img_count; ++idx) {
+                img_info.image = ctx.swap_chain.img[idx];
+                mina_vk_assert(
+                    vkCreateImageView(ctx.dev, &img_info, nullptr, &ctx.swap_chain.img_view[idx]));
+            }
+        }
+
+        // NOTE: Does the same as `create_frame_buffers` but without initializing the frame buffer
+        // array,
+        //       simply reusing and overriding its memory.
+        void recreate_frame_buffers(GraphicsContext& ctx) noexcept {
+            usize const img_count = ctx.swap_chain.img_view.size;
+            ctx.swap_chain.frame_buf.init(ctx.persistent_arena, img_count);
+
+            VkFramebufferCreateInfo fb_info{
+                .sType           = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO,
+                .renderPass      = ctx.pipelines.graphics.pass.handle,
+                .attachmentCount = 1,
+                .width           = ctx.swap_chain.extent.width,
+                .height          = ctx.swap_chain.extent.height,
+                .layers          = 1,
+            };
+
+            for (u32 idx = 0; idx < img_count; ++idx) {
+                fb_info.pAttachments = &ctx.swap_chain.img_view[idx];
+                mina_vk_assert(vkCreateFramebuffer(
+                    ctx.dev,
+                    &fb_info,
+                    nullptr,
+                    &ctx.swap_chain.frame_buf[idx]));
+            }
+        }
+
+        void recreate_swap_chain(GraphicsContext& ctx) noexcept {
+            ctx.window.wait_if_minimized();
+
+            // Complete all operations before proceeding
+            vkDeviceWaitIdle(ctx.dev);
+
+            destroy_swap_chain(ctx);
+            {
+                auto          sarena = ctx.work_arena->make_scratch();
+                SwapChainInfo swc_info;
+                query_swap_chain_info(sarena.arena, ctx.pdev, ctx.surf, swc_info);
+
+                // NOTE: since the swap chain creation doesn't require persistent arena memory, we
+                // can
+                //       simply create it again (no need for a "recreate" function).
+                create_swap_chain(ctx, swc_info);
+            }
+            recreate_image_views(ctx);
+            recreate_frame_buffers(ctx);
+        }
+
+    }  // namespace
 
     void query_swap_chain_info(
         psh::Arena*      arena,
@@ -67,7 +156,7 @@ namespace mina::gfx {
         vkGetPhysicalDeviceSurfaceCapabilitiesKHR(pdev, surf, &swc_info.surf_capa);
     }
 
-    void create_swap_chain(SwapChainInfo const& swc_info, GraphicsContext& ctx) noexcept {
+    void create_swap_chain(GraphicsContext& ctx, SwapChainInfo const& swc_info) noexcept {
         // Select optimal surface format.
         u32 optimal_surf_fmt_idx = 0;
         for (u32 idx = 0; idx < swc_info.surf_fmt.size; ++idx) {
@@ -90,11 +179,11 @@ namespace mina::gfx {
             i32 fb_width, fb_height;
             glfwGetFramebufferSize(ctx.window.handle, &fb_width, &fb_height);
 
-            ctx.swap_chain.extent.width = psh::clamp(
+            ctx.swap_chain.extent.width = psh_clamp(
                 static_cast<u32>(fb_width),
                 swc_info.surf_capa.minImageExtent.width,
                 swc_info.surf_capa.maxImageExtent.width);
-            ctx.swap_chain.extent.height = psh::clamp(
+            ctx.swap_chain.extent.height = psh_clamp(
                 static_cast<u32>(fb_height),
                 swc_info.surf_capa.minImageExtent.height,
                 swc_info.surf_capa.maxImageExtent.height);
@@ -103,19 +192,18 @@ namespace mina::gfx {
         // Select optimal present mode.
         //
         // NOTE: Although mailbox may be better for performance reasons, it may cause the screen
-        // region
-        //       that got reduced to be completely black, as if we just erased that part from the
-        //       frame buffer.
+        //       region that got reduced to be completely black, as if we just erased that part from
+        //       the frame buffer.
         VkPresentModeKHR optimal_present_mode = VK_PRESENT_MODE_FIFO_KHR;
-        if (psh::contains(VK_PRESENT_MODE_MAILBOX_KHR, swc_info.pres_modes.const_fat_ptr())) {
-            optimal_present_mode = VK_PRESENT_MODE_MAILBOX_KHR;
-        }
+        // if (psh::contains(VK_PRESENT_MODE_MAILBOX_KHR, swc_info.pres_modes.const_fat_ptr())) {
+        //     optimal_present_mode = VK_PRESENT_MODE_MAILBOX_KHR;
+        // }
 
         // Compute the number of images handled by the swap chain.
         u32 const max_img_count = swc_info.surf_capa.maxImageCount;
         u32       img_count     = swc_info.surf_capa.minImageCount + 1;
         if (max_img_count != 0) {  // There is a restricted maximum.
-            img_count = psh::min(img_count, max_img_count);
+            img_count = psh_min(img_count, max_img_count);
         }
 
         ctx.swap_chain.max_frames_in_flight = img_count - 1;
@@ -142,20 +230,21 @@ namespace mina::gfx {
             .oldSwapchain     = nullptr,
         };
 
-        auto          sarena = ctx.work_arena->make_scratch();
-        psh::Set<u32> queue_set{ctx.queues.indices(), sarena.arena};
-        usize const   unique_idx_count = queue_set.data.size;
+        auto               sarena           = ctx.work_arena->make_scratch();
+        psh::DynArray<u32> queue_uidx       = ctx.queues.unique_indices(sarena.arena);
+        usize const        unique_idx_count = queue_uidx.size;
         if (unique_idx_count != 1) {
             create_info.imageSharingMode      = VK_SHARING_MODE_CONCURRENT;
             create_info.queueFamilyIndexCount = static_cast<u32>(unique_idx_count);
-            create_info.pQueueFamilyIndices   = queue_set.data.buf;
+            create_info.pQueueFamilyIndices   = queue_uidx.buf;
         } else {
             // In the exclusive case we have to deal with ownership transfers of the images
             // between queue families.
             create_info.imageSharingMode = VK_SHARING_MODE_EXCLUSIVE;
         }
 
-        mina_vk_assert(vkCreateSwapchainKHR(ctx.dev, &create_info, nullptr, &ctx.swap_chain.handle));
+        mina_vk_assert(
+            vkCreateSwapchainKHR(ctx.dev, &create_info, nullptr, &ctx.swap_chain.handle));
     }
 
     void create_image_views(GraphicsContext& ctx) noexcept {
@@ -164,41 +253,6 @@ namespace mina::gfx {
 
         ctx.swap_chain.img.init(ctx.persistent_arena, img_count);
         ctx.swap_chain.img_view.init(ctx.persistent_arena, img_count);
-
-        vkGetSwapchainImagesKHR(ctx.dev, ctx.swap_chain.handle, &img_count, ctx.swap_chain.img.buf);
-
-        VkImageViewCreateInfo img_info{
-            .sType    = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO,
-            .viewType = VK_IMAGE_VIEW_TYPE_2D,
-            .format   = ctx.swap_chain.surf_fmt.format,
-            .components =
-                VkComponentMapping{
-                    .r = VK_COMPONENT_SWIZZLE_IDENTITY,
-                    .g = VK_COMPONENT_SWIZZLE_IDENTITY,
-                    .b = VK_COMPONENT_SWIZZLE_IDENTITY,
-                    .a = VK_COMPONENT_SWIZZLE_IDENTITY,
-                },
-            .subresourceRange =
-                VkImageSubresourceRange{
-                    .aspectMask     = VK_IMAGE_ASPECT_COLOR_BIT,
-                    .baseMipLevel   = 0,
-                    .levelCount     = 1,
-                    .baseArrayLayer = 0,
-                    .layerCount     = 1,
-                },
-        };
-
-        for (u32 idx = 0; idx < img_count; ++idx) {
-            img_info.image = ctx.swap_chain.img[idx];
-            mina_vk_assert(
-                vkCreateImageView(ctx.dev, &img_info, nullptr, &ctx.swap_chain.img_view[idx]));
-        }
-    }
-
-    // Does the same as `create_image_views` but without initializing the image and image view
-    // arrays, simply reusing and overriding their memory.
-    void recreate_image_views(GraphicsContext& ctx) noexcept {
-        u32 img_count = static_cast<u32>(ctx.swap_chain.img.size);
 
         vkGetSwapchainImagesKHR(ctx.dev, ctx.swap_chain.handle, &img_count, ctx.swap_chain.img.buf);
 
@@ -250,49 +304,6 @@ namespace mina::gfx {
         }
     }
 
-    // NOTE: Does the same as `create_frame_buffers` but without initializing the frame buffer
-    // array,
-    //       simply reusing and overriding its memory.
-    void recreate_frame_buffers(GraphicsContext& ctx) noexcept {
-        usize const img_count = ctx.swap_chain.img_view.size;
-        ctx.swap_chain.frame_buf.init(ctx.persistent_arena, img_count);
-
-        VkFramebufferCreateInfo fb_info{
-            .sType           = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO,
-            .renderPass      = ctx.pipelines.graphics.pass.handle,
-            .attachmentCount = 1,
-            .width           = ctx.swap_chain.extent.width,
-            .height          = ctx.swap_chain.extent.height,
-            .layers          = 1,
-        };
-
-        for (u32 idx = 0; idx < img_count; ++idx) {
-            fb_info.pAttachments = &ctx.swap_chain.img_view[idx];
-            mina_vk_assert(
-                vkCreateFramebuffer(ctx.dev, &fb_info, nullptr, &ctx.swap_chain.frame_buf[idx]));
-        }
-    }
-
-    void recreate_swap_chain(GraphicsContext& ctx) noexcept {
-        ctx.window.wait_if_minimized();
-
-        // Complete all operations before proceeding
-        vkDeviceWaitIdle(ctx.dev);
-
-        destroy_swap_chain(ctx);
-        {
-            auto          sarena = ctx.work_arena->make_scratch();
-            SwapChainInfo swc_info;
-            query_swap_chain_info(sarena.arena, ctx.pdev, ctx.surf, swc_info);
-
-            // NOTE: since the swap chain creation doesn't require persistent arena memory, we can
-            //       simply create it again (no need for a "recreate" function).
-            create_swap_chain(swc_info, ctx);
-        }
-        recreate_image_views(ctx);
-        recreate_frame_buffers(ctx);
-    }
-
     bool prepare_frame_for_rendering(GraphicsContext& ctx) noexcept {
         u32 const current_frame = ctx.swap_chain.current_frame;
 
@@ -327,7 +338,7 @@ namespace mina::gfx {
         }
 
         // Late reset to avoid deadlocks.
-        if (success) {
+        if (psh_likely(success)) {
             mina_vk_assert(vkResetFences(ctx.dev, 1, &ctx.sync.frame_in_flight[current_frame]));
         }
 

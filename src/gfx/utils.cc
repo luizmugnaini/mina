@@ -29,14 +29,14 @@
 namespace mina::gfx {
     bool has_validation_layers(
         psh::ScratchArena&&       sarena,
-        psh::FatPtr<StrPtr const> layers) noexcept {
+        psh::FatPtr<strptr const> layers) noexcept {
         u32 avail_layer_count;
         vkEnumerateInstanceLayerProperties(&avail_layer_count, nullptr);
 
         psh::Array<VkLayerProperties> avail_layers{sarena.arena, avail_layer_count};
         vkEnumerateInstanceLayerProperties(&avail_layer_count, avail_layers.buf);
 
-        for (StrPtr l : layers) {
+        for (strptr l : layers) {
             bool found = false;
             for (auto const& al : avail_layers) {
                 if (psh::str_equal(l, al.layerName)) {
@@ -55,14 +55,14 @@ namespace mina::gfx {
 
     bool has_required_extensions(
         psh::ScratchArena&&       sarena,
-        psh::FatPtr<StrPtr const> exts) noexcept {
+        psh::FatPtr<strptr const> exts) noexcept {
         u32 avail_ext_count;
         vkEnumerateInstanceExtensionProperties(nullptr, &avail_ext_count, nullptr);
 
         psh::Array<VkExtensionProperties> avail_ext{sarena.arena, avail_ext_count};
         vkEnumerateInstanceExtensionProperties(nullptr, &avail_ext_count, avail_ext.buf);
 
-        for (StrPtr e : exts) {
+        for (strptr e : exts) {
             bool found = false;
             for (auto const& ae : avail_ext) {
                 if (psh::str_equal(e, ae.extensionName)) {
@@ -79,8 +79,8 @@ namespace mina::gfx {
         return true;
     }
 
-    StrPtr debug_msg_type_str(VkDebugUtilsMessageTypeFlagsEXT type) noexcept {
-        StrPtr type_str;
+    strptr debug_msg_type_str(VkDebugUtilsMessageTypeFlagsEXT type) noexcept {
+        strptr type_str;
         switch (type) {
             case VK_DEBUG_UTILS_MESSAGE_TYPE_GENERAL_BIT_EXT: {
                 type_str = "general";

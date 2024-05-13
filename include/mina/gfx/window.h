@@ -199,5 +199,7 @@ namespace mina::gfx {
         // TODO: the window shouldn't be responsible for polling the events, only updating itself.
         /// Poll events and update the window.
         void poll_events() noexcept;
+
+        void set_title(strptr title) noexcept;
     };
 }  // namespace mina::gfx

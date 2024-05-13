@@ -32,8 +32,8 @@ namespace mina::gfx {
     VkShaderModule make_shader_module(VkDevice dev, psh::StringView const& shader_src) noexcept {
         VkShaderModuleCreateInfo sm_info{
             .sType    = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO,
-            .codeSize = shader_src.length,
-            .pCode    = reinterpret_cast<u32 const*>(shader_src.str),
+            .codeSize = shader_src.data.size,
+            .pCode    = reinterpret_cast<u32 const*>(shader_src.data.buf),
         };
 
         VkShaderModule sm;
@@ -42,7 +42,7 @@ namespace mina::gfx {
             log_fmt(
                 psh::LogLevel::Error,
                 "Couldn't make shader module for shader:\n%s",
-                shader_src.str);
+                shader_src.data.buf);
         }
 
         return sm;
@@ -106,15 +106,18 @@ namespace mina::gfx {
         // Render pass associated to the immediate graphics pipeline.
         create_graphics_render_pass(ctx);
 
+        auto sarena = ctx.work_arena->make_scratch();
+
+        psh::FileReadResult vert =
+            psh::read_file(sarena.arena, shader_path(ShaderCatalog::TriangleVertex));
+        psh::FileReadResult frag =
+            psh::read_file(sarena.arena, shader_path(ShaderCatalog::TriangleFragment));
+        psh_assert(vert.status == psh::FileStatus::OK && frag.status == psh::FileStatus::OK);
+
         // Shader modules.
-        auto                           sarena = ctx.work_arena->make_scratch();
         psh::Buffer<VkShaderModule, 2> shaders{
-            make_shader_module(
-                ctx.dev,
-                psh::read_file(sarena.arena, shader_path(ShaderCatalog::TriangleVertex))),
-            make_shader_module(
-                ctx.dev,
-                psh::read_file(sarena.arena, shader_path(ShaderCatalog::TriangleFragment))),
+            make_shader_module(ctx.dev, vert.content.view()),
+            make_shader_module(ctx.dev, frag.content.view()),
 
         };
 

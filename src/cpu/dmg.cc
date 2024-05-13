@@ -22,74 +22,158 @@
 #include <mina/cpu/dmg.h>
 
 #include <psh/assert.h>
+#include <psh/intrinsics.h>
 
 // TODO: detach behaviour from the CPU struct so that we can pass references instead of pointers.
 
 namespace mina::dmg {
-    static void add_hl_r16(CPU* cpu, Reg16 reg) noexcept {
-        u16 const val = cpu->reg.read(reg);
-        u16 const hl  = cpu->reg.read(Reg16::HL);
+    // Implementation of the instructions
+    namespace {
+        void add_hl_r16(CPU* cpu, Reg16 reg) noexcept {
+            u16 const val = cpu->reg.read(reg);
+            u16 const hl  = cpu->reg.read(Reg16::HL);
 
-        u32 const res = hl + val;
-        cpu->reg.hl   = static_cast<u16>(res);
+            u32 const res = hl + val;
+            cpu->reg.hl   = static_cast<u16>(res);
 
-        cpu->reg.af &= 0xFF00;  // Clear all flags.
-        cpu->reg.set_flag_if(Flag::C, res > 0x0000FFFF);
-        cpu->reg.set_flag_if(Flag::H, ((hl & 0x00FF) + (val & 0x00FF)) > 0x00FF);
+            cpu->reg.af &= 0xFF00;  // Clear all flags.
+            cpu->reg.set_or_clear_flag_if(Flag::C, res > 0x0000FFFF);
+            cpu->reg.set_or_clear_flag_if(Flag::H, ((hl & 0x00FF) + (val & 0x00FF)) > 0x00FF);
+        }
+
+        void add(CPU* cpu, u8 val) noexcept {
+            u8 const acc = cpu->reg.acc();
+
+            u16 const res = acc + val;
+            cpu->reg.af   = psh::as_high_u16(static_cast<u8>(res));  // All flags clear.
+
+            cpu->reg.set_or_clear_flag_if(Flag::C, res > 0x00FF);
+            cpu->reg.set_or_clear_flag_if(Flag::H, ((acc & 0x0F) + (val & 0x0F)) > 0x0F);
+            cpu->reg.set_or_clear_flag_if(Flag::Z, res == 0);
+        }
+
+        void add_sp_e8(CPU* cpu, i8 offset) noexcept {
+            auto const res = static_cast<u16>(psh_lb_add(
+                static_cast<i16>(cpu->reg.sp),
+                static_cast<i16>(offset),
+                static_cast<i16>(0)));
+            cpu->reg.sp    = res;
+
+            cpu->reg.af &= 0xFF00;  // Clear all flags.
+            cpu->reg.set_or_clear_flag_if(Flag::C, res > 0x0000FFFF);
+            cpu->reg.set_or_clear_flag_if(Flag::H, ((cpu->reg.sp & 0x00FF) + offset) > 0x00FF);
+        }
+
+        void adc(CPU* cpu, u8 val) noexcept {
+            u8 const acc   = cpu->reg.acc();
+            u8 const carry = cpu->reg.flag(Flag::C);
+
+            u16 const res = acc + val + carry;
+            cpu->reg.af   = psh::as_high_u16(static_cast<u8>(res));  // All flags clear.
+
+            cpu->reg.set_or_clear_flag_if(Flag::C, res > 0x00FF);
+            cpu->reg.set_or_clear_flag_if(Flag::H, ((acc & 0x0F) + (val & 0x0F) + carry) > 0x0F);
+            cpu->reg.set_or_clear_flag_if(Flag::Z, res == 0);
+        }
+
+        void jp_u16(CPU* cpu) noexcept {
+            cpu->reg.pc = cpu->bus_read_imm16();
+        }
+    }  // namespace
+
+    u8 CPURegisters::acc() const {
+        return static_cast<u8>(af >> 8);
     }
 
-    static void add(CPU* cpu, u8 val) noexcept {
-        u8 const acc = cpu->reg.acc();
-
-        u16 const res = acc + val;
-        cpu->reg.af   = psh::as_high_u16(static_cast<u8>(res));  // All flags clear.
-
-        cpu->reg.set_flag_if(Flag::C, res > 0x00FF);
-        cpu->reg.set_flag_if(Flag::H, ((acc & 0x0F) + (val & 0x0F)) > 0x0F);
-        cpu->reg.set_flag_if(Flag::Z, res == 0);
+    u8 CPURegisters::read(Reg8 r) const {
+        u8 val;
+        switch (r) {
+            case Reg8::A: val = static_cast<u8>(af >> 8); break;
+            case Reg8::B: val = static_cast<u8>(bc >> 8); break;
+            case Reg8::C: val = static_cast<u8>(bc & 0x00FF); break;
+            case Reg8::D: val = static_cast<u8>(de >> 8); break;
+            case Reg8::E: val = static_cast<u8>(de & 0x00FF); break;
+            case Reg8::H: val = static_cast<u8>(hl >> 8); break;
+            case Reg8::L: val = static_cast<u8>(hl & 0x00FF); break;
+        }
+        return val;
     }
 
-    static void add_sp_e8(CPU* cpu, i8 offset) noexcept {
-        auto const res = static_cast<u16>(psh::lb_add(
-            static_cast<i16>(cpu->reg.sp),
-            static_cast<i16>(offset),
-            static_cast<i16>(0)));
-        cpu->reg.sp    = res;
-
-        cpu->reg.af &= 0xFF00;  // Clear all flags.
-        cpu->reg.set_flag_if(Flag::C, res > 0x0000FFFF);
-        cpu->reg.set_flag_if(Flag::H, ((cpu->reg.sp & 0x00FF) + offset) > 0x00FF);
+    u16 CPURegisters::read(Reg16 r) const {
+        u16 val;
+        switch (r) {
+            case Reg16::BC: val = bc; break;
+            case Reg16::DE: val = de; break;
+            case Reg16::HL: val = hl; break;
+            case Reg16::SP: val = sp; break;
+        }
+        return val;
     }
 
-    static void adc(CPU* cpu, u8 val) noexcept {
-        u8 const acc   = cpu->reg.acc();
-        u8 const carry = cpu->reg.flag(Flag::C);
+    u8 CPURegisters::flag(Flag f) const {
+        u8 flags = af & 0x00FF;
 
-        u16 const res = acc + val + carry;
-        cpu->reg.af   = psh::as_high_u16(static_cast<u8>(res));  // All flags clear.
-
-        cpu->reg.set_flag_if(Flag::C, res > 0x00FF);
-        cpu->reg.set_flag_if(Flag::H, ((acc & 0x0F) + (val & 0x0F) + carry) > 0x0F);
-        cpu->reg.set_flag_if(Flag::Z, res == 0);
+        u8 val;
+        switch (f) {
+            case Flag::C: val = static_cast<u8>(flags << 4); break;
+            case Flag::H: val = static_cast<u8>(flags << 5); break;
+            case Flag::N: val = static_cast<u8>(flags << 6); break;
+            case Flag::Z: val = static_cast<u8>(flags << 7); break;
+        }
+        return val;
     }
 
-    u8 CPU::cycle_read(u16) noexcept {
-        psh_todo();
-        return 0;
+    void CPURegisters::set_flag(Flag f) {
+        switch (f) {
+            case Flag::C: af |= psh::bit(4);
+            case Flag::H: af |= psh::bit(5);
+            case Flag::N: af |= psh::bit(6);
+            case Flag::Z: af |= psh::bit(7);
+        }
     }
 
-    u8 CPU::read_imm8() noexcept {
-        psh_todo();
-        return 0;
+    void CPURegisters::clear_flag(Flag f) {
+        switch (f) {
+            case Flag::C: af &= psh::clear_bit(4);
+            case Flag::H: af &= psh::clear_bit(5);
+            case Flag::N: af &= psh::clear_bit(6);
+            case Flag::Z: af &= psh::clear_bit(7);
+        }
     }
 
-    u16 CPU::read_imm16() noexcept {
-        psh_todo();
-        return 0;
+    void CPURegisters::set_or_clear_flag_if(Flag f, bool cond) {
+        auto const icond = static_cast<i32>(cond);
+        switch (f) {
+            case Flag::C: af ^= ((-icond ^ af) & psh::bit(4)); break;
+            case Flag::H: af ^= ((-icond ^ af) & psh::bit(5)); break;
+            case Flag::N: af ^= ((-icond ^ af) & psh::bit(6)); break;
+            case Flag::Z: af ^= ((-icond ^ af) & psh::bit(7)); break;
+        }
     }
 
-    void CPU::dexec(u16 instr) noexcept {
-        auto opcode = static_cast<Opcode>(instr & 0x00FF);
+    u8 CPU::bus_read_byte(u16 addr) noexcept {
+        u8 const* memory = mmap.memstart();
+        bus_addr         = addr;
+        return memory[bus_addr];
+    }
+
+    u8 CPU::bus_read_imm8() noexcept {
+        u8 const* memory = mmap.memstart();
+        u8 const  bt     = memory[reg.pc++];
+        bus_addr         = reg.pc;
+        return bt;
+    }
+
+    u16 CPU::bus_read_imm16() noexcept {
+        u8 const* memory = mmap.memstart();
+        u8 const  lo     = memory[reg.pc++];
+        u8 const  hi     = memory[reg.pc++];
+        bus_addr         = reg.pc;
+        return psh::make_u16(hi, lo);
+    }
+
+    void CPU::dexec(u8 data) noexcept {
+        auto opcode = static_cast<Opcode>(data);
         switch (opcode) {
             case Opcode::Nop: {
                 break;
@@ -504,7 +588,7 @@ namespace mina::dmg {
                 break;
             }
             case Opcode::ADD_a_hl_ptr: {
-                add(this, cycle_read(reg.read(Reg16::HL)));
+                add(this, static_cast<u8>(this->bus_read_byte(reg.read(Reg16::HL))));
                 break;
             }
             case Opcode::ADD_a_a: {
@@ -536,7 +620,7 @@ namespace mina::dmg {
                 break;
             }
             case Opcode::ADC_a_hl: {
-                adc(this, this->cycle_read(reg.read(Reg16::HL)));
+                adc(this, static_cast<u8>(this->bus_read_byte(reg.read(Reg16::HL))));
                 break;
             }
             case Opcode::ADC_a_a: {
@@ -697,6 +781,7 @@ namespace mina::dmg {
                 break;
             }
             case Opcode::JP_u16: {
+                jp_u16(this);
                 break;
             }
             case Opcode::CALL_nz_u16: {
@@ -706,7 +791,7 @@ namespace mina::dmg {
                 break;
             }
             case Opcode::ADD_a_u8: {
-                add(this, read_imm8());
+                add(this, this->bus_read_imm8());
                 break;
             }
             case Opcode::RST_0x00: {
@@ -722,6 +807,7 @@ namespace mina::dmg {
                 break;
             }
             case Opcode::PREFIX_0xCB: {
+                psh_todo();
                 break;
             }
             case Opcode::CALL_z_u16: {
@@ -731,7 +817,7 @@ namespace mina::dmg {
                 break;
             }
             case Opcode::ADC_a_u8: {
-                adc(this, this->read_imm8());
+                adc(this, this->bus_read_imm8());
                 break;
             }
             case Opcode::RST_0x08: {
@@ -795,7 +881,7 @@ namespace mina::dmg {
                 break;
             }
             case Opcode::ADD_sp_i8: {
-                add_sp_e8(this, static_cast<i8>(cycle_read(reg.pc++)));
+                add_sp_e8(this, static_cast<i8>(this->bus_read_byte(reg.pc++)));
                 break;
             }
             case Opcode::JP_hl: {
@@ -850,5 +936,10 @@ namespace mina::dmg {
                 break;
             }
         }
+    }
+
+    void CPU::run_cycle() noexcept {
+        u8 data = this->bus_read_byte(reg.pc++);
+        this->dexec(data);
     }
 }  // namespace mina::dmg

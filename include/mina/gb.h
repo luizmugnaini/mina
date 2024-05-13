@@ -21,20 +21,26 @@
 
 #pragma once
 
+#include <mina/cart.h>
+#include <mina/cpu/dmg.h>
 #include <mina/gfx/context.h>
+#include <mina/memory_map.h>
 #include <psh/arena.h>
 #include <psh/memory_manager.h>
 
 namespace mina {
     struct GameBoy {
-        psh::MemoryManager   memory_manager;
-        psh::Arena           persistent_arena;
-        psh::Arena           frame_arena;
-        psh::Arena           work_arena;
-        gfx::GraphicsContext graphics_context;
+        psh::MemoryManager   memory_manager{};
+        psh::Arena           rom_arena{};
+        psh::Arena           gfx_arena{};
+        psh::Arena           frame_arena{};
+        psh::Arena           work_arena{};
+        gfx::GraphicsContext graphics_context{};
+        GbCart               cart{};
+        dmg::CPU             cpu{};
 
         GameBoy() noexcept;
         ~GameBoy() noexcept;
-        void run() noexcept;
+        void run(psh::StringView cart_path) noexcept;
     };
 }  // namespace mina
