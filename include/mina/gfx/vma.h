@@ -40,12 +40,15 @@
 #if defined(__clang__)
 #    pragma clang diagnostic push
 #    pragma clang diagnostic ignored "-Wold-style-cast"
+#    pragma clang diagnostic ignored "-Wcast-align"
 #    pragma clang diagnostic ignored "-Wunused-function"
+#    pragma clang diagnostic ignored "-Wunused-parameter"
 #    pragma clang diagnostic ignored "-Wunused-variable"
 #    pragma clang diagnostic ignored "-Wsign-conversion"
 #    pragma clang diagnostic ignored "-Wcovered-switch-default"
 #    pragma clang diagnostic ignored "-Wnullability-extension"
 #    pragma clang diagnostic ignored "-Wnullability-completeness"
+#    pragma clang diagnostic ignored "-Wmissing-field-initializers"
 #endif  // __clang__
 
 #include <vk_mem_alloc.h>

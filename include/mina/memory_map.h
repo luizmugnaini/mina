@@ -695,8 +695,7 @@ namespace mina {
         HwRegisterBank   reg{};
         HighRAM          hram{};
         InterruptEnable  ie{};
-
-        u8*  memstart() noexcept;
-        void fixed_rom_bank_transfer(GbCart const& cart) noexcept;
     };
+
+    void transfer_fixed_rom_bank(GbCart const& cart, MemoryMap& mmap) noexcept;
 }  // namespace mina

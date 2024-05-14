@@ -24,6 +24,7 @@
 #include <mina/gfx/context.h>
 #include <mina/gfx/pipeline.h>
 #include <mina/gfx/swap_chain.h>
+#include <mina/memory_map.h>
 #include <mina/meta/info.h>
 
 namespace mina {
@@ -34,9 +35,10 @@ namespace mina {
             return cart_valid;
         }
 
-        psh::Buffer<char, 11> extract_cart_title(GameBoy* gb) noexcept {
-            constexpr MemoryRange TITLE     = gb->cpu.mmap.fx_rom.header.GAME_TITLE;
-            constexpr usize TITLE_FIRST_IDX = TITLE.start - gb->cpu.mmap.fx_rom.header.RANGE.start;
+        psh::Buffer<char, FxROMBank::CartHeader::GAME_TITLE.size()> extract_cart_title(
+            GameBoy* gb) noexcept {
+            constexpr usize TITLE_FIRST_IDX =
+                FxROMBank::CartHeader::GAME_TITLE.start - FxROMBank::CartHeader::RANGE.start;
 
             psh::Buffer<char, 11> buf{};
             for (u16 idx = 0; idx < 11; ++idx) {
@@ -88,16 +90,19 @@ namespace mina {
                 break;
             }
             case psh::FileStatus::OutOfMemory: {
-                psh::log(psh::LogLevel::Fatal, "Not enough memory to read the cartridge data.");
+                psh::log_fmt(psh::LogLevel::Fatal, "Not enough memory to read the cartridge data.");
                 return;
             }
             default: {
-                psh::log(psh::LogLevel::Fatal, "Unable to read cartridge data.");
+                psh::log_fmt(
+                    psh::LogLevel::Fatal,
+                    "Unable to read cartridge data %s",
+                    cart_path.data.buf);
                 return;
             }
         }
 
-        cpu.mmap.fixed_rom_bank_transfer(cart);
+        cpu.mmap.transfer_fixed_rom_bank(cart);
         // TODO(luiz): transfer the remaining memory regions.
 
         // Try to update the window title.

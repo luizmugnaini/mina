@@ -20,8 +20,10 @@
 /// Author: Luiz G. Mugnaini A. <luizmuganini@gmail.com>
 
 #include <mina/memory_map.h>
+
 #include <psh/assert.h>
 #include <psh/io.h>
+#include <cstddef>
 
 using namespace mina;
 

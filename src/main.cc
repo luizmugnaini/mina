@@ -20,12 +20,14 @@
 /// Author: Luiz G. Mugnaini A. <luizmuganini@gmail.com>
 
 #include <mina/gb.h>
+#include <psh/assert.h>
 #include <psh/io.h>
 
 #include <cstdlib>
 
 // TODO: accept path from input instead of hard-coding it.
 int main() {
+    psh_assert_msg(false, "Got ya!");
     mina::GameBoy gb{};
     gb.run(psh_string_view("ignore/roms/drmario.gb"));
     return EXIT_SUCCESS;
