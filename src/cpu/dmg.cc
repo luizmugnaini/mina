@@ -534,13 +534,14 @@ namespace mina::dmg {
         }
 
         void add_sp_imm8(CPU* cpu) noexcept {
-            i8  offset      = static_cast<i8>(bus_read_imm8(cpu));
-            u16 sp          = cpu->regfile.sp;
-            cpu->regfile.sp = static_cast<u16>(static_cast<i32>(sp) + offset);
+            i8  offset = static_cast<i8>(bus_read_imm8(cpu));
+            u16 sp     = mina_read_reg16(cpu, Reg16::SP);
+            u32 res    = static_cast<u32>(sp + offset);
+            mina_set_reg16(cpu, Reg16::SP, static_cast<u16>(res));
 
             mina_clear_all_flags(cpu->regfile);
-            mina_set_or_clear_flag_if(cpu->regfile, Flag::C, sp + offset > 0xFFFF);
-            mina_set_or_clear_flag_if(cpu->regfile, Flag::H, (psh_u16_lo(sp) + offset) > 0x00FF);
+            mina_set_or_clear_flag_if(cpu->regfile, Flag::C, res > 0xFFFF);
+            mina_set_or_clear_flag_if(cpu->regfile, Flag::H, psh_u16_lo(sp) + offset > 0x00FF);
         }
 
         void adc_a_r8(CPU* cpu, Reg8 reg) noexcept {
@@ -832,20 +833,19 @@ namespace mina::dmg {
                 }
 
                 case Opcode::LD_hl_sp_plus_i8: {
-                    i8 offset = static_cast<i8>(bus_read_imm8(cpu));
-                    cpu->regfile.sp += offset;
-                    mina_set_reg16(cpu, Reg16::HL, cpu->regfile.sp);
+                    i8  offset = static_cast<i8>(bus_read_imm8(cpu));
+                    u16 sp     = mina_read_reg16(cpu, Reg16::SP);
+                    u32 res    = static_cast<u32>(sp + offset);
+                    mina_set_reg16(cpu, Reg16::SP, static_cast<u16>(res));
+                    mina_set_reg16(cpu, Reg16::HL, static_cast<u16>(res));
 
                     mina_clear_flag(cpu->regfile, Flag::Z);
                     mina_clear_flag(cpu->regfile, Flag::N);
-                    mina_set_or_clear_flag_if(
-                        cpu->regfile,
-                        Flag::C,
-                        static_cast<u32>(cpu->regfile.sp + offset) > 0xFFFF);
+                    mina_set_or_clear_flag_if(cpu->regfile, Flag::C, res > 0xFFFF);
                     mina_set_or_clear_flag_if(
                         cpu->regfile,
                         Flag::H,
-                        static_cast<u16>(psh_u16_lo(cpu->regfile.sp) + offset) > 0xFF);
+                        static_cast<u16>(psh_u16_lo(sp) + offset) > 0xFF);
                     break;
                 }
 
@@ -854,7 +854,7 @@ namespace mina::dmg {
                     break;
                 }
                 case Opcode::LD_u16_ptr_sp: {
-                    mina_mmap_write_word(cpu, bus_read_imm16(cpu), cpu->regfile.sp);
+                    mina_mmap_write_word(cpu, bus_read_imm16(cpu), mina_read_reg16(cpu, Reg16::SP));
                     break;
                 }
                 case Opcode::LD_u16_ptr_a: {
