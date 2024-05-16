@@ -16,5 +16,6 @@ Diagnostics:
       - modernize-use-trailing-return-type
       - modernize-avoid-c-arrays
       - modernize-use-nodiscard
+      - modernize-use-auto
       - misc-non-private-member-variables-in-classes
       - misc-use-anonymous-namespace

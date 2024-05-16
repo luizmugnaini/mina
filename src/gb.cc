@@ -102,7 +102,7 @@ namespace mina {
             }
         }
 
-        cpu.mmap.transfer_fixed_rom_bank(cart);
+        transfer_fixed_rom_bank(cart, cpu.mmap);
         // TODO(luiz): transfer the remaining memory regions.
 
         // Try to update the window title.

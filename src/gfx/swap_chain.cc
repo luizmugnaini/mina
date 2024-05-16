@@ -26,6 +26,7 @@
 #include <psh/intrinsics.h>
 #include <psh/mem_utils.h>
 #include <vulkan/vulkan_core.h>
+#include <cstring>
 
 namespace mina::gfx {
     namespace {
@@ -125,7 +126,7 @@ namespace mina::gfx {
         VkSurfaceKHR     surf,
         SwapChainInfo&   swc_info) noexcept {
         // Clear all previous queries.
-        psh::zero_struct(&swc_info);
+        std::memset(reinterpret_cast<void*>(&swc_info), 0, sizeof(SwapChainInfo));
 
         // Surface formats.
         {

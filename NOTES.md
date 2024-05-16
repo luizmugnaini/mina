@@ -22,6 +22,7 @@
 - [gbops, an accurate opcode table for the Game Boy](https://izik1.github.io/gbops/).
 - [CPU opcode reference](https://rgbds.gbdev.io/docs/v0.7.0/gbz80.7).
 - [Game Boy Opcode Summary](http://www.devrs.com/gb/files/opcodes.html).
+- [Decoding Game Boy Z80 Opcodes](https://gb-archive.github.io/salvage/decoding_gbz80_opcodes/Decoding%20Gamboy%20Z80%20Opcodes.html).
 
 ## Tests
 

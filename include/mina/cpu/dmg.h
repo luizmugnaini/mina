@@ -28,13 +28,26 @@
 #include <psh/types.h>
 
 namespace mina::dmg {
+    /// CPU register file.
+    ///
+    /// Note: In order to avoid dealing with architecture endianness, we are going to separate each
+    ///       16-bit register into their 8-bit components and work always with little-endiannes. The
+    ///       reasoning for choosing little-endian is because the Game Boy itself and most modern
+    ///       architectures are little-endian.
+    ///
+    ///       The only registers that don't follow this rule are the stack pointer and program
+    ///       counter, since they are never accessed by their byte components.
     struct RegisterFile {
-        u16 af = 0x0000;  ///< Hi: accumulator, Lo: flag.
-        u16 bc = 0x0000;  ///< Hi: B, Lo: C.
-        u16 de = 0x0000;  ///< Hi: D, Lo: E.
-        u16 hl = 0x0000;  ///< Hi: H, Lo: L.
-        u16 sp = 0x0000;  ///< Stack Pointer.
-        u16 pc = 0x0000;  ///< Program counter.
+        u8  f  = 0x00;
+        u8  a  = 0x00;
+        u8  c  = 0x00;
+        u8  b  = 0x00;
+        u8  e  = 0x00;
+        u8  d  = 0x00;
+        u8  l  = 0x00;
+        u8  h  = 0x00;
+        u16 sp = 0x0000;
+        u16 pc = 0x0000;
     };
 
     /// DMG, the original Game Boy CPU.
