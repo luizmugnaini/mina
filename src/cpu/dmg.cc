@@ -461,243 +461,6 @@ namespace mina::dmg {
         }
 
         ///////////////////////////////////////////////////////////////////////
-        // Jump instructions.
-        ///////////////////////////////////////////////////////////////////////
-
-        void jp_cc_imm16(CPU* cpu, Cond cc) noexcept {
-            if (read_condition_flag(cpu, cc)) {
-                cpu->regfile.pc = bus_read_imm16(cpu);
-            }
-        }
-
-        ///////////////////////////////////////////////////////////////////////
-        // Relative jump instructions.
-        ///////////////////////////////////////////////////////////////////////
-
-        void jr_imm16(CPU* cpu) noexcept {
-            i8 rel_addr = static_cast<i8>(bus_read_imm16(cpu));
-            cpu->regfile.pc += rel_addr;
-        }
-
-        void jr_cc_imm16(CPU* cpu, Cond cc) noexcept {
-            if (read_condition_flag(cpu, cc)) {
-                i8 rel_addr = static_cast<i8>(bus_read_imm16(cpu));
-                cpu->regfile.pc += rel_addr;
-            }
-        }
-
-        ///////////////////////////////////////////////////////////////////////
-        // Arithmetic/Logic Unit instructions.
-        ///////////////////////////////////////////////////////////////////////
-
-        void add_a_r8(CPU* cpu, Reg8 reg) noexcept {
-            u8  val        = read_reg8(cpu, reg);
-            u8  acc        = cpu->regfile.a;
-            u16 res        = static_cast<u16>(acc + val);
-            cpu->regfile.a = static_cast<u8>(res);
-
-            mina_clear_all_flags(cpu->regfile);
-            mina_set_or_clear_flag_if(cpu, Flag::C, res > 0x00FF);
-            mina_set_or_clear_flag_if(cpu, Flag::H, (psh_u8_lo(acc) + psh_u8_lo(val)) > 0x0F);
-            mina_set_or_clear_flag_if(cpu, Flag::Z, res == 0);
-        }
-
-        void add_hl_r16(CPU* cpu, Reg16 reg) noexcept {
-            u16 val = mina_read_reg16(cpu, reg);
-            u16 hl  = mina_read_reg16(cpu, Reg16::HL);
-            mina_set_reg16(cpu, Reg16::HL, static_cast<u16>(hl + val));
-
-            mina_clear_all_flags(cpu->regfile);
-            mina_set_or_clear_flag_if(cpu, Flag::C, hl + val > 0xFFFF);
-            mina_set_or_clear_flag_if(cpu, Flag::H, psh_u16_lo(hl) + psh_u16_lo(val) > 0x00FF);
-        }
-
-        void add_a_imm8(CPU* cpu) noexcept {
-            u8  val        = bus_read_imm8(cpu);
-            u8  acc        = cpu->regfile.a;
-            u16 res        = static_cast<u16>(acc + val);
-            cpu->regfile.a = static_cast<u8>(res);
-
-            mina_clear_all_flags(cpu->regfile);
-            mina_set_or_clear_flag_if(cpu, Flag::C, res > 0x00FF);
-            mina_set_or_clear_flag_if(cpu, Flag::H, (psh_u8_lo(acc) + psh_u8_lo(val)) > 0x0F);
-            mina_set_or_clear_flag_if(cpu, Flag::Z, res == 0);
-        }
-
-        void add_sp_imm8(CPU* cpu) noexcept {
-            i8  offset = static_cast<i8>(bus_read_imm8(cpu));
-            u16 sp     = mina_read_reg16(cpu, Reg16::SP);
-            u32 res    = static_cast<u32>(sp + offset);
-            mina_set_reg16(cpu, Reg16::SP, static_cast<u16>(res));
-
-            mina_clear_all_flags(cpu->regfile);
-            mina_set_or_clear_flag_if(cpu, Flag::C, res > 0xFFFF);
-            mina_set_or_clear_flag_if(cpu, Flag::H, psh_u16_lo(sp) + offset > 0x00FF);
-        }
-
-        void adc_a_r8(CPU* cpu, Reg8 reg) noexcept {
-            u8  val        = read_reg8(cpu, reg);
-            u8  acc        = cpu->regfile.a;
-            u8  carry      = mina_read_flag(cpu, Flag::C);
-            u16 res        = static_cast<u16>(acc + val + carry);
-            cpu->regfile.a = static_cast<u8>(res);
-
-            mina_clear_all_flags(cpu->regfile);
-            mina_set_or_clear_flag_if(cpu, Flag::Z, res == 0);
-            mina_set_or_clear_flag_if(
-                cpu,
-                Flag::H,
-                (psh_u8_lo(acc) + psh_u8_lo(val) + carry) > 0x0F);
-            mina_set_or_clear_flag_if(cpu, Flag::C, res > 0x00FF);
-        }
-
-        void adc_a_imm8(CPU* cpu) noexcept {
-            u8  val        = bus_read_imm8(cpu);
-            u8  acc        = cpu->regfile.a;
-            u8  carry      = mina_read_flag(cpu, Flag::C);
-            u16 res        = static_cast<u16>(acc + val + carry);
-            cpu->regfile.a = static_cast<u8>(res);
-
-            mina_clear_all_flags(cpu->regfile);
-            mina_set_or_clear_flag_if(cpu, Flag::Z, res == 0);
-            mina_set_or_clear_flag_if(
-                cpu,
-                Flag::H,
-                (psh_u8_lo(acc) + psh_u8_lo(val) + carry) > 0x0F);
-            mina_set_or_clear_flag_if(cpu, Flag::C, res > 0x00FF);
-        }
-
-        void sub_a_r8(CPU* cpu, Reg8 reg) noexcept {
-            u8 val = read_reg8(cpu, reg);
-            u8 acc = cpu->regfile.a;
-            cpu->regfile.a -= val;
-
-            mina_set_flag(cpu, Flag::N);
-            mina_set_or_clear_flag_if(cpu, Flag::Z, cpu->regfile.a == 0);
-            mina_set_or_clear_flag_if(cpu, Flag::H, psh_u8_lo(val) > psh_u8_lo(acc));
-            mina_set_or_clear_flag_if(cpu, Flag::C, val > acc);
-        }
-
-        void sub_a_imm8(CPU* cpu) noexcept {
-            u8 val = bus_read_imm8(cpu);
-            u8 acc = cpu->regfile.a;
-            cpu->regfile.a -= val;
-
-            mina_set_flag(cpu, Flag::N);
-            mina_set_or_clear_flag_if(cpu, Flag::Z, cpu->regfile.a == 0);
-            mina_set_or_clear_flag_if(cpu, Flag::H, psh_u8_lo(val) > psh_u8_lo(acc));
-            mina_set_or_clear_flag_if(cpu, Flag::C, val > acc);
-        }
-
-        void sbc_a_r8(CPU* cpu, Reg8 reg) noexcept {
-            u8 val   = read_reg8(cpu, reg);
-            u8 acc   = cpu->regfile.a;
-            u8 carry = mina_read_flag(cpu, Flag::C);
-            cpu->regfile.a -= val - carry;
-
-            mina_set_flag(cpu, Flag::N);
-            mina_set_or_clear_flag_if(cpu, Flag::Z, cpu->regfile.a == 0);
-            mina_set_or_clear_flag_if(cpu, Flag::H, psh_u8_lo(val) + carry > psh_u8_lo(acc));
-            mina_set_or_clear_flag_if(cpu, Flag::C, val + carry > acc);
-        }
-
-        void sbc_a_imm8(CPU* cpu) noexcept {
-            u8 val   = bus_read_imm8(cpu);
-            u8 acc   = cpu->regfile.a;
-            u8 carry = mina_read_flag(cpu, Flag::C);
-            cpu->regfile.a -= val - carry;
-
-            mina_set_flag(cpu, Flag::N);
-            mina_set_or_clear_flag_if(cpu, Flag::Z, cpu->regfile.a == 0);
-            mina_set_or_clear_flag_if(cpu, Flag::H, psh_u8_lo(val) + carry > psh_u8_lo(acc));
-            mina_set_or_clear_flag_if(cpu, Flag::C, val + carry > acc);
-        }
-
-        void and_a_r8(CPU* cpu, Reg8 reg) noexcept {
-            u8 val = read_reg8(cpu, reg);
-            cpu->regfile.a &= val;
-
-            mina_clear_all_flags(cpu->regfile);
-            mina_set_or_clear_flag_if(cpu, Flag::Z, cpu->regfile.a == 0);
-            mina_set_flag(cpu, Flag::H);
-        }
-
-        void and_a_imm8(CPU* cpu) noexcept {
-            cpu->regfile.a &= bus_read_imm8(cpu);
-
-            mina_clear_all_flags(cpu->regfile);
-            mina_set_flag(cpu, Flag::H);
-            mina_set_or_clear_flag_if(cpu, Flag::Z, cpu->regfile.a == 0);
-        }
-
-        void xor_a_r8(CPU* cpu, Reg8 reg) noexcept {
-            u8 val = read_reg8(cpu, reg);
-            cpu->regfile.a ^= val;
-
-            mina_clear_all_flags(cpu->regfile);
-            mina_set_or_clear_flag_if(cpu, Flag::Z, cpu->regfile.a == 0);
-        }
-
-        void xor_a_imm8(CPU* cpu) noexcept {
-            cpu->regfile.a ^= bus_read_imm8(cpu);
-
-            mina_clear_all_flags(cpu->regfile);
-            mina_set_or_clear_flag_if(cpu, Flag::Z, cpu->regfile.a == 0);
-        }
-
-        void or_a_r8(CPU* cpu, Reg8 reg) noexcept {
-            u8 val = read_reg8(cpu, reg);
-            cpu->regfile.a |= val;
-
-            mina_clear_all_flags(cpu->regfile);
-            mina_set_or_clear_flag_if(cpu, Flag::Z, cpu->regfile.a == 0);
-        }
-
-        void or_a_imm8(CPU* cpu) noexcept {
-            u8 val = bus_read_imm8(cpu);
-            cpu->regfile.a |= val;
-
-            mina_clear_all_flags(cpu->regfile);
-            mina_set_or_clear_flag_if(cpu, Flag::Z, cpu->regfile.a == 0);
-        }
-
-        void cp_a_r8(CPU* cpu, Reg8 reg) noexcept {
-            u8 val = read_reg8(cpu, reg);
-
-            mina_set_flag(cpu, Flag::N);
-            mina_set_or_clear_flag_if(cpu, Flag::Z, cpu->regfile.a == val);
-            mina_set_or_clear_flag_if(cpu, Flag::C, val > cpu->regfile.a);
-            mina_set_or_clear_flag_if(cpu, Flag::H, psh_u8_lo(val) > psh_u8_lo(cpu->regfile.a));
-        }
-
-        void cp_a_imm8(CPU* cpu) noexcept {
-            u8 val = bus_read_imm8(cpu);
-
-            mina_set_flag(cpu, Flag::N);
-            mina_set_or_clear_flag_if(cpu, Flag::Z, cpu->regfile.a == val);
-            mina_set_or_clear_flag_if(cpu, Flag::C, val > cpu->regfile.a);
-            mina_set_or_clear_flag_if(cpu, Flag::H, psh_u8_lo(val) > psh_u8_lo(cpu->regfile.a));
-        }
-
-        void inc_r8(CPU* cpu, Reg8 reg) noexcept {
-            u8 prev_val = read_reg8(cpu, reg);
-            set_reg8(cpu, reg, prev_val + 1);
-
-            mina_clear_flag(cpu, Flag::N);
-            mina_set_or_clear_flag_if(cpu, Flag::Z, prev_val + 1 == 0);
-            mina_set_or_clear_flag_if(cpu, Flag::H, psh_u8_lo(prev_val) + 1 > 0x0F);
-        }
-
-        void dec_r8(CPU* cpu, Reg8 reg) noexcept {
-            u8 prev_val = read_reg8(cpu, reg);
-            set_reg8(cpu, reg, prev_val - 1);
-
-            mina_set_flag(cpu, Flag::N);
-            mina_set_or_clear_flag_if(cpu, Flag::Z, prev_val - 1 == 0);
-            mina_set_or_clear_flag_if(cpu, Flag::H, psh_u8_lo(prev_val) - 1 > 0x0F);
-        }
-
-        ///////////////////////////////////////////////////////////////////////
         // Decode and execute instructions.
         ///////////////////////////////////////////////////////////////////////
 
@@ -713,8 +476,6 @@ namespace mina::dmg {
                 case Opcode::Nop: {
                     break;
                 }
-
-                    // - Load instructions  ----------------------------------------
 
                 case Opcode::HALT: {  // NOTE(luiz): Only exception, load [HL] [HL] causes a halt.
                                       // WARNING(luiz): Don't change its position.
@@ -910,14 +671,20 @@ namespace mina::dmg {
                 }
 
                 case Opcode::JR_i8: {
-                    jr_imm16(cpu);
+                    i8 rel_addr = static_cast<i8>(bus_read_imm16(cpu));
+                    cpu->regfile.pc += rel_addr;
                     break;
                 }
+
                 case Opcode::JR_nz_i8:
                 case Opcode::JR_z_i8:
                 case Opcode::JR_nc_i8:
                 case Opcode::JR_c_i8:  {
-                    jr_cc_imm16(cpu, static_cast<Cond>(y - 4));
+                    Cond cc = static_cast<Cond>(y - 4);
+                    if (read_condition_flag(cpu, cc)) {
+                        i8 rel_addr = static_cast<i8>(bus_read_imm16(cpu));
+                        cpu->regfile.pc += rel_addr;
+                    }
                     break;
                 }
 
@@ -925,15 +692,20 @@ namespace mina::dmg {
                     cpu->regfile.pc = mina_read_reg16(cpu, Reg16::HL);
                     break;
                 }
+
                 case Opcode::JP_u16: {
                     cpu->regfile.pc = bus_read_imm16(cpu);
                     break;
                 }
+
                 case Opcode::JP_nz_u16:
                 case Opcode::JP_z_u16:
                 case Opcode::JP_nc_u16:
                 case Opcode::JP_c_u16:  {
-                    jp_cc_imm16(cpu, static_cast<Cond>(y));
+                    Cond cc = static_cast<Cond>(y);
+                    if (read_condition_flag(cpu, cc)) {
+                        cpu->regfile.pc = bus_read_imm16(cpu);
+                    }
                     break;
                 }
 
@@ -945,9 +717,16 @@ namespace mina::dmg {
                 case Opcode::INC_l:
                 case Opcode::INC_hl_ptr:
                 case Opcode::INC_a:      {
-                    inc_r8(cpu, static_cast<Reg8>(y));
+                    Reg8 reg      = static_cast<Reg8>(y);
+                    u8   prev_val = read_reg8(cpu, reg);
+                    set_reg8(cpu, reg, prev_val + 1);
+
+                    mina_clear_flag(cpu, Flag::N);
+                    mina_set_or_clear_flag_if(cpu, Flag::Z, prev_val + 1 == 0);
+                    mina_set_or_clear_flag_if(cpu, Flag::H, psh_u8_lo(prev_val) + 1 > 0x0F);
                     break;
                 }
+
                 case Opcode::INC_bc:
                 case Opcode::INC_de:
                 case Opcode::INC_hl:
@@ -965,9 +744,16 @@ namespace mina::dmg {
                 case Opcode::DEC_l:
                 case Opcode::DEC_hl_ptr:
                 case Opcode::DEC_a:      {
-                    dec_r8(cpu, static_cast<Reg8>(y));
+                    Reg8 reg      = static_cast<Reg8>(y);
+                    u8   prev_val = read_reg8(cpu, reg);
+                    set_reg8(cpu, reg, prev_val - 1);
+
+                    mina_set_flag(cpu, Flag::N);
+                    mina_set_or_clear_flag_if(cpu, Flag::Z, prev_val - 1 == 0);
+                    mina_set_or_clear_flag_if(cpu, Flag::H, psh_u8_lo(prev_val) - 1 > 0x0F);
                     break;
                 }
+
                 case Opcode::DEC_bc:
                 case Opcode::DEC_de:
                 case Opcode::DEC_hl:
@@ -985,22 +771,65 @@ namespace mina::dmg {
                 case Opcode::ADD_a_l:
                 case Opcode::ADD_a_hl_ptr:
                 case Opcode::ADD_a_a:      {
-                    add_a_r8(cpu, static_cast<Reg8>(z));
+                    Reg8 reg       = static_cast<Reg8>(z);
+                    u8   val       = read_reg8(cpu, reg);
+                    u8   acc       = cpu->regfile.a;
+                    u16  res       = static_cast<u16>(acc + val);
+                    cpu->regfile.a = static_cast<u8>(res);
+
+                    mina_clear_all_flags(cpu->regfile);
+                    mina_set_or_clear_flag_if(cpu, Flag::C, res > 0x00FF);
+                    mina_set_or_clear_flag_if(
+                        cpu,
+                        Flag::H,
+                        (psh_u8_lo(acc) + psh_u8_lo(val)) > 0x0F);
+                    mina_set_or_clear_flag_if(cpu, Flag::Z, res == 0);
                     break;
                 }
+
                 case Opcode::ADD_a_u8: {
-                    add_a_imm8(cpu);
+                    u8  val        = bus_read_imm8(cpu);
+                    u8  acc        = cpu->regfile.a;
+                    u16 res        = static_cast<u16>(acc + val);
+                    cpu->regfile.a = static_cast<u8>(res);
+
+                    mina_clear_all_flags(cpu->regfile);
+                    mina_set_or_clear_flag_if(cpu, Flag::C, res > 0x00FF);
+                    mina_set_or_clear_flag_if(
+                        cpu,
+                        Flag::H,
+                        (psh_u8_lo(acc) + psh_u8_lo(val)) > 0x0F);
+                    mina_set_or_clear_flag_if(cpu, Flag::Z, res == 0);
                     break;
                 }
+
                 case Opcode::ADD_sp_i8: {
-                    add_sp_imm8(cpu);
+                    i8  offset = static_cast<i8>(bus_read_imm8(cpu));
+                    u16 sp     = mina_read_reg16(cpu, Reg16::SP);
+                    u32 res    = static_cast<u32>(sp + offset);
+                    mina_set_reg16(cpu, Reg16::SP, static_cast<u16>(res));
+
+                    mina_clear_all_flags(cpu->regfile);
+                    mina_set_or_clear_flag_if(cpu, Flag::C, res > 0xFFFF);
+                    mina_set_or_clear_flag_if(cpu, Flag::H, psh_u16_lo(sp) + offset > 0x00FF);
                     break;
                 }
+
                 case Opcode::ADD_hl_bc:
                 case Opcode::ADD_hl_de:
                 case Opcode::ADD_hl_hl:
                 case Opcode::ADD_hl_sp: {
-                    add_hl_r16(cpu, static_cast<Reg16>(p));
+                    Reg16 reg = static_cast<Reg16>(p);
+                    u16   val = mina_read_reg16(cpu, reg);
+                    u16   hl  = mina_read_reg16(cpu, Reg16::HL);
+                    mina_set_reg16(cpu, Reg16::HL, static_cast<u16>(hl + val));
+
+                    mina_clear_all_flags(cpu->regfile);
+                    mina_set_or_clear_flag_if(cpu, Flag::C, hl + val > 0xFFFF);
+                    mina_set_or_clear_flag_if(
+                        cpu,
+                        Flag::H,
+                        psh_u16_lo(hl) + psh_u16_lo(val) > 0x00FF);
                     break;
                 }
 
@@ -1012,11 +841,37 @@ namespace mina::dmg {
                 case Opcode::ADC_a_l:
                 case Opcode::ADC_a_hl_ptr:
                 case Opcode::ADC_a_a:      {
-                    adc_a_r8(cpu, static_cast<Reg8>(z));
+                    Reg8 reg       = static_cast<Reg8>(z);
+                    u8   val       = read_reg8(cpu, reg);
+                    u8   acc       = cpu->regfile.a;
+                    u8   carry     = mina_read_flag(cpu, Flag::C);
+                    u16  res       = static_cast<u16>(acc + val + carry);
+                    cpu->regfile.a = static_cast<u8>(res);
+
+                    mina_clear_all_flags(cpu->regfile);
+                    mina_set_or_clear_flag_if(cpu, Flag::Z, res == 0);
+                    mina_set_or_clear_flag_if(
+                        cpu,
+                        Flag::H,
+                        (psh_u8_lo(acc) + psh_u8_lo(val) + carry) > 0x0F);
+                    mina_set_or_clear_flag_if(cpu, Flag::C, res > 0x00FF);
                     break;
                 }
+
                 case Opcode::ADC_a_u8: {
-                    adc_a_imm8(cpu);
+                    u8  val        = bus_read_imm8(cpu);
+                    u8  acc        = cpu->regfile.a;
+                    u8  carry      = mina_read_flag(cpu, Flag::C);
+                    u16 res        = static_cast<u16>(acc + val + carry);
+                    cpu->regfile.a = static_cast<u8>(res);
+
+                    mina_clear_all_flags(cpu->regfile);
+                    mina_set_or_clear_flag_if(cpu, Flag::Z, res == 0);
+                    mina_set_or_clear_flag_if(
+                        cpu,
+                        Flag::H,
+                        (psh_u8_lo(acc) + psh_u8_lo(val) + carry) > 0x0F);
+                    mina_set_or_clear_flag_if(cpu, Flag::C, res > 0x00FF);
                     break;
                 }
 
@@ -1028,11 +883,27 @@ namespace mina::dmg {
                 case Opcode::SUB_a_l:
                 case Opcode::SUB_a_hl_ptr:
                 case Opcode::SUB_a_a:      {
-                    sub_a_r8(cpu, static_cast<Reg8>(z));
+                    Reg8 reg = static_cast<Reg8>(z);
+                    u8   val = read_reg8(cpu, reg);
+                    u8   acc = cpu->regfile.a;
+                    cpu->regfile.a -= val;
+
+                    mina_set_flag(cpu, Flag::N);
+                    mina_set_or_clear_flag_if(cpu, Flag::Z, cpu->regfile.a == 0);
+                    mina_set_or_clear_flag_if(cpu, Flag::H, psh_u8_lo(val) > psh_u8_lo(acc));
+                    mina_set_or_clear_flag_if(cpu, Flag::C, val > acc);
                     break;
                 }
+
                 case Opcode::SUB_a_u8: {
-                    sub_a_imm8(cpu);
+                    u8 val = bus_read_imm8(cpu);
+                    u8 acc = cpu->regfile.a;
+                    cpu->regfile.a -= val;
+
+                    mina_set_flag(cpu, Flag::N);
+                    mina_set_or_clear_flag_if(cpu, Flag::Z, cpu->regfile.a == 0);
+                    mina_set_or_clear_flag_if(cpu, Flag::H, psh_u8_lo(val) > psh_u8_lo(acc));
+                    mina_set_or_clear_flag_if(cpu, Flag::C, val > acc);
                     break;
                 }
 
@@ -1044,11 +915,35 @@ namespace mina::dmg {
                 case Opcode::SBC_a_l:
                 case Opcode::SBC_a_hl_ptr:
                 case Opcode::SBC_a_a:      {
-                    sbc_a_r8(cpu, static_cast<Reg8>(z));
+                    Reg8 reg   = static_cast<Reg8>(z);
+                    u8   val   = read_reg8(cpu, reg);
+                    u8   acc   = cpu->regfile.a;
+                    u8   carry = mina_read_flag(cpu, Flag::C);
+                    cpu->regfile.a -= val - carry;
+
+                    mina_set_flag(cpu, Flag::N);
+                    mina_set_or_clear_flag_if(cpu, Flag::Z, cpu->regfile.a == 0);
+                    mina_set_or_clear_flag_if(
+                        cpu,
+                        Flag::H,
+                        psh_u8_lo(val) + carry > psh_u8_lo(acc));
+                    mina_set_or_clear_flag_if(cpu, Flag::C, val + carry > acc);
                     break;
                 }
+
                 case Opcode::SBC_a_u8: {
-                    sbc_a_imm8(cpu);
+                    u8 val   = bus_read_imm8(cpu);
+                    u8 acc   = cpu->regfile.a;
+                    u8 carry = mina_read_flag(cpu, Flag::C);
+                    cpu->regfile.a -= val - carry;
+
+                    mina_set_flag(cpu, Flag::N);
+                    mina_set_or_clear_flag_if(cpu, Flag::Z, cpu->regfile.a == 0);
+                    mina_set_or_clear_flag_if(
+                        cpu,
+                        Flag::H,
+                        psh_u8_lo(val) + carry > psh_u8_lo(acc));
+                    mina_set_or_clear_flag_if(cpu, Flag::C, val + carry > acc);
                     break;
                 }
 
@@ -1060,11 +955,22 @@ namespace mina::dmg {
                 case Opcode::AND_a_l:
                 case Opcode::AND_a_hl_ptr:
                 case Opcode::AND_a_a:      {
-                    and_a_r8(cpu, static_cast<Reg8>(z));
+                    Reg8 reg = static_cast<Reg8>(z);
+                    u8   val = read_reg8(cpu, reg);
+                    cpu->regfile.a &= val;
+
+                    mina_clear_all_flags(cpu->regfile);
+                    mina_set_or_clear_flag_if(cpu, Flag::Z, cpu->regfile.a == 0);
+                    mina_set_flag(cpu, Flag::H);
                     break;
                 }
+
                 case Opcode::AND_a_u8: {
-                    and_a_imm8(cpu);
+                    cpu->regfile.a &= bus_read_imm8(cpu);
+
+                    mina_clear_all_flags(cpu->regfile);
+                    mina_set_flag(cpu, Flag::H);
+                    mina_set_or_clear_flag_if(cpu, Flag::Z, cpu->regfile.a == 0);
                     break;
                 }
 
@@ -1076,11 +982,20 @@ namespace mina::dmg {
                 case Opcode::XOR_a_l:
                 case Opcode::XOR_a_hl_ptr:
                 case Opcode::XOR_a_a:      {
-                    xor_a_r8(cpu, static_cast<Reg8>(z));
+                    Reg8 reg = static_cast<Reg8>(z);
+                    u8   val = read_reg8(cpu, reg);
+                    cpu->regfile.a ^= val;
+
+                    mina_clear_all_flags(cpu->regfile);
+                    mina_set_or_clear_flag_if(cpu, Flag::Z, cpu->regfile.a == 0);
                     break;
                 }
+
                 case Opcode::XOR_a_u8: {
-                    xor_a_imm8(cpu);
+                    cpu->regfile.a ^= bus_read_imm8(cpu);
+
+                    mina_clear_all_flags(cpu->regfile);
+                    mina_set_or_clear_flag_if(cpu, Flag::Z, cpu->regfile.a == 0);
                     break;
                 }
 
@@ -1092,11 +1007,21 @@ namespace mina::dmg {
                 case Opcode::OR_a_l:
                 case Opcode::OR_a_hl_ptr:
                 case Opcode::OR_a_a:      {
-                    or_a_r8(cpu, static_cast<Reg8>(z));
+                    Reg8 reg = static_cast<Reg8>(z);
+                    u8   val = read_reg8(cpu, reg);
+                    cpu->regfile.a |= val;
+
+                    mina_clear_all_flags(cpu->regfile);
+                    mina_set_or_clear_flag_if(cpu, Flag::Z, cpu->regfile.a == 0);
                     break;
                 }
+
                 case Opcode::OR_a_u8: {
-                    or_a_imm8(cpu);
+                    u8 val = bus_read_imm8(cpu);
+                    cpu->regfile.a |= val;
+
+                    mina_clear_all_flags(cpu->regfile);
+                    mina_set_or_clear_flag_if(cpu, Flag::Z, cpu->regfile.a == 0);
                     break;
                 }
 
@@ -1108,11 +1033,29 @@ namespace mina::dmg {
                 case Opcode::CP_a_l:
                 case Opcode::CP_a_hl_ptr:
                 case Opcode::CP_a_a:      {
-                    cp_a_r8(cpu, static_cast<Reg8>(z));
+                    Reg8 reg = static_cast<Reg8>(z);
+                    u8   val = read_reg8(cpu, reg);
+
+                    mina_set_flag(cpu, Flag::N);
+                    mina_set_or_clear_flag_if(cpu, Flag::Z, cpu->regfile.a == val);
+                    mina_set_or_clear_flag_if(cpu, Flag::C, val > cpu->regfile.a);
+                    mina_set_or_clear_flag_if(
+                        cpu,
+                        Flag::H,
+                        psh_u8_lo(val) > psh_u8_lo(cpu->regfile.a));
                     break;
                 }
+
                 case Opcode::CP_a_u8: {
-                    cp_a_imm8(cpu);
+                    u8 val = bus_read_imm8(cpu);
+
+                    mina_set_flag(cpu, Flag::N);
+                    mina_set_or_clear_flag_if(cpu, Flag::Z, cpu->regfile.a == val);
+                    mina_set_or_clear_flag_if(cpu, Flag::C, val > cpu->regfile.a);
+                    mina_set_or_clear_flag_if(
+                        cpu,
+                        Flag::H,
+                        psh_u8_lo(val) > psh_u8_lo(cpu->regfile.a));
                     break;
                 }
 
