@@ -129,7 +129,7 @@ namespace mina::dmg {
             RRA                = 0x1F,
             JR_nz_i8           = 0x20,
             LD_hl_u16          = 0x21,
-            LD_high_hl_ptr_a   = 0x22,
+            LDI_hl_ptr_a       = 0x22,
             INC_hl             = 0x23,
             INC_h              = 0x24,
             DEC_h              = 0x25,
@@ -137,7 +137,7 @@ namespace mina::dmg {
             DAA                = 0x27,
             JR_z_i8            = 0x28,
             ADD_hl_hl          = 0x29,
-            LD_a_high_hl_ptr   = 0x2A,
+            LDI_a_hl_ptr       = 0x2A,
             DEC_hl             = 0x2B,
             INC_l              = 0x2C,
             DEC_l              = 0x2D,
@@ -145,7 +145,7 @@ namespace mina::dmg {
             CPL                = 0x2F,
             JR_nc_i8           = 0x30,
             LD_sp_u16          = 0x31,
-            LD_low_hl_ptr_a    = 0x32,
+            LDD_hl_ptr_a       = 0x32,
             INC_sp             = 0x33,
             INC_hl_ptr         = 0x34,
             DEC_hl_ptr         = 0x35,
@@ -153,7 +153,7 @@ namespace mina::dmg {
             SCF                = 0x37,
             JR_c_i8            = 0x38,
             ADD_hl_sp          = 0x39,
-            LD_a_low_hl_ptr    = 0x3A,
+            LDD_a_hl_ptr       = 0x3A,
             DEC_sp             = 0x3B,
             INC_a              = 0x3C,
             DEC_a              = 0x3D,
@@ -306,7 +306,6 @@ namespace mina::dmg {
             RET_nc             = 0xD0,
             POP_de             = 0xD1,
             JP_nc_u16          = 0xD2,
-            // Not defined (0xD3)
             CALL_nc_u16        = 0xD4,
             PUSH_de            = 0xD5,
             SUB_a_u8           = 0xD6,
@@ -314,32 +313,24 @@ namespace mina::dmg {
             RET_c              = 0xD8,
             RETI               = 0xD9,
             JP_c_u16           = 0xDA,
-            // Not defined (0xDB)
             CALL_c_u16         = 0xDC,
-            // Not defined (0xDD)
             SBC_a_u8           = 0xDE,
             RST_0x18           = 0xDF,
-            LDH_imm16_ptr_a    = 0xE0,
+            LDH_u16_ptr_a      = 0xE0,
             POP_hl             = 0xE1,
             LD_0xFF00_plus_c_a = 0xE2,
-            // Not defined (0xE3)
-            // Not defined (0xE4)
             PUSH_hl            = 0xE5,
             AND_a_u8           = 0xE6,
             RST_0x20           = 0xE7,
             ADD_sp_i8          = 0xE8,
             JP_hl              = 0xE9,
             LD_u16_ptr_a       = 0xEA,
-            // Not defined (0xEB)
-            // Not defined (0xEC)
-            // Not defined (0xED)
             XOR_a_u8           = 0xEE,
             RST_0x28           = 0xEF,
-            LDH_a_imm16_ptr    = 0xF0,
+            LDH_a_u16_ptr      = 0xF0,
             POP_af             = 0xF1,
             LD_a_0xFF00_plus_c = 0xF2,
             DI                 = 0xF3,
-            // Not defined (0xF4)
             PUSH_af            = 0xF5,
             OR_a_u8            = 0xF6,
             RST_0x30           = 0xF7,
@@ -347,8 +338,6 @@ namespace mina::dmg {
             LD_sp_hl           = 0xF9,
             LD_a_u16_ptr       = 0xFA,
             EI                 = 0xFB,
-            // Not defined (0xFC)
-            // Not defined (0xFD)
             CP_a_u8            = 0xFE,
             RST_0x38           = 0xFF,
         };
@@ -817,6 +806,7 @@ namespace mina::dmg {
                     set_reg8(cpu, static_cast<Reg8>(y), read_reg8(cpu, static_cast<Reg8>(z)));
                     break;
                 }
+
                 case Opcode::LD_b_u8:
                 case Opcode::LD_c_u8:
                 case Opcode::LD_d_u8:
@@ -828,6 +818,7 @@ namespace mina::dmg {
                     set_reg8(cpu, static_cast<Reg8>(y), bus_read_imm8(cpu));
                     break;
                 }
+
                 case Opcode::LD_bc_u16:
                 case Opcode::LD_de_u16:
                 case Opcode::LD_hl_u16:
@@ -835,64 +826,98 @@ namespace mina::dmg {
                     mina_set_reg16(cpu, static_cast<Reg16>(p), bus_read_imm16(cpu));
                     break;
                 }
-                case Opcode::LD_bc_ptr_a: {
-                    mina_mmap_write_byte(cpu, mina_read_reg16(cpu, Reg16::BC), cpu->regfile.a);
-                    break;
-                }
-                case Opcode::LD_hl_sp_plus_i8: {
-                    break;
-                }
                 case Opcode::LD_sp_hl: {
                     mina_set_reg16(cpu, Reg16::SP, mina_read_reg16(cpu, Reg16::HL));
                     break;
                 }
 
+                case Opcode::LD_hl_sp_plus_i8: {
+                    i8 offset = static_cast<i8>(bus_read_imm8(cpu));
+                    cpu->regfile.sp += offset;
+                    mina_set_reg16(cpu, Reg16::HL, cpu->regfile.sp);
+
+                    mina_clear_flag(cpu->regfile, Flag::Z);
+                    mina_clear_flag(cpu->regfile, Flag::N);
+                    mina_set_or_clear_flag_if(
+                        cpu->regfile,
+                        Flag::C,
+                        static_cast<u32>(cpu->regfile.sp + offset) > 0xFFFF);
+                    mina_set_or_clear_flag_if(
+                        cpu->regfile,
+                        Flag::H,
+                        static_cast<u16>(psh_u16_lo(cpu->regfile.sp) + offset) > 0xFF);
+                    break;
+                }
+
+                case Opcode::LD_bc_ptr_a: {
+                    mina_mmap_write_byte(cpu, mina_read_reg16(cpu, Reg16::BC), cpu->regfile.a);
+                    break;
+                }
                 case Opcode::LD_u16_ptr_sp: {
                     mina_mmap_write_word(cpu, bus_read_imm16(cpu), cpu->regfile.sp);
                     break;
                 }
                 case Opcode::LD_u16_ptr_a: {
+                    mina_mmap_write_byte(cpu, bus_read_imm16(cpu), cpu->regfile.a);
                     break;
                 }
                 case Opcode::LD_a_u16_ptr: {
+                    cpu->regfile.a = bus_read_byte(cpu, bus_read_imm16(cpu));
                     break;
                 }
 
-                case Opcode::LD_a_bc_ptr: {
-                    break;
-                }
-                case Opcode::LD_a_de_ptr: {
-                    break;
-                }
-                case Opcode::LD_de_ptr_a: {
-                    break;
-                }
-                case Opcode::LD_high_hl_ptr_a: {
-                    break;
-                }
-                case Opcode::LD_a_high_hl_ptr: {
-                    break;
-                }
-                case Opcode::LD_low_hl_ptr_a: {
-                    break;
-                }
-                case Opcode::LD_a_low_hl_ptr: {
-                    break;
-                }
-
-                case Opcode::LDH_imm16_ptr_a: {
+                case Opcode::LDH_u16_ptr_a: {
                     u16 addr = bus_read_imm16(cpu);
                     if (0xFF00 <= addr) {
                         mina_mmap_write_byte(cpu, addr, cpu->regfile.a);
                     }
                     break;
                 }
-                case Opcode::LDH_a_imm16_ptr: {
+                case Opcode::LDH_a_u16_ptr: {
                     u16 addr = bus_read_imm16(cpu);
                     if (0xFF00 <= addr) {
                         u8 const* memory = mina_cpu_memory(cpu);
                         cpu->regfile.a   = *(memory + addr);
                     }
+                    break;
+                }
+
+                case Opcode::LD_a_bc_ptr: {
+                    cpu->regfile.a = bus_read_byte(cpu, mina_read_reg16(cpu, Reg16::BC));
+                    break;
+                }
+                case Opcode::LD_a_de_ptr: {
+                    cpu->regfile.a = bus_read_byte(cpu, mina_read_reg16(cpu, Reg16::DE));
+                    break;
+                }
+                case Opcode::LD_de_ptr_a: {
+                    mina_mmap_write_byte(cpu, mina_read_reg16(cpu, Reg16::DE), cpu->regfile.a);
+                    break;
+                }
+
+                case Opcode::LDI_hl_ptr_a: {
+                    u16 hl = mina_read_reg16(cpu, Reg16::HL);
+                    mina_mmap_write_byte(cpu, hl, cpu->regfile.a);
+                    mina_set_reg16(cpu, Reg16::HL, hl + 1);
+                    break;
+                }
+                case Opcode::LDD_hl_ptr_a: {
+                    u16 hl = mina_read_reg16(cpu, Reg16::HL);
+                    mina_mmap_write_byte(cpu, hl, cpu->regfile.a);
+                    mina_set_reg16(cpu, Reg16::HL, hl - 1);
+                    break;
+                }
+
+                case Opcode::LDI_a_hl_ptr: {
+                    u16 hl         = mina_read_reg16(cpu, Reg16::HL);
+                    cpu->regfile.a = bus_read_byte(cpu, hl);
+                    mina_set_reg16(cpu, Reg16::HL, hl + 1);
+                    break;
+                }
+                case Opcode::LDD_a_hl_ptr: {
+                    u16 hl         = mina_read_reg16(cpu, Reg16::HL);
+                    cpu->regfile.a = bus_read_byte(cpu, hl);
+                    mina_set_reg16(cpu, Reg16::HL, hl - 1);
                     break;
                 }
 
@@ -930,35 +955,6 @@ namespace mina::dmg {
                 case Opcode::JP_nc_u16:
                 case Opcode::JP_c_u16:  {
                     jp_cc_imm16(cpu, static_cast<Cond>(y));
-                    break;
-                }
-
-                case Opcode::RLCA: {
-                    break;
-                }
-                case Opcode::RRCA: {
-                    break;
-                }
-                case Opcode::STOP: {
-                    psh_todo_msg("STOP");
-                    break;
-                }
-                case Opcode::RLA: {
-                    break;
-                }
-                case Opcode::RRA: {
-                    break;
-                }
-                case Opcode::DAA: {
-                    break;
-                }
-                case Opcode::CPL: {
-                    break;
-                }
-                case Opcode::SCF: {
-                    break;
-                }
-                case Opcode::CCF: {
                     break;
                 }
 
@@ -1141,6 +1137,35 @@ namespace mina::dmg {
                     break;
                 }
 
+                // TODO(luiz): Implement the remaining instructions.
+                case Opcode::RLCA: {
+                    break;
+                }
+                case Opcode::RRCA: {
+                    break;
+                }
+                case Opcode::STOP: {
+                    psh_todo_msg("STOP");
+                    break;
+                }
+                case Opcode::RLA: {
+                    break;
+                }
+                case Opcode::RRA: {
+                    break;
+                }
+                case Opcode::DAA: {
+                    break;
+                }
+                case Opcode::CPL: {
+                    break;
+                }
+                case Opcode::SCF: {
+                    break;
+                }
+                case Opcode::CCF: {
+                    break;
+                }
                 case Opcode::RET_nz: {
                     break;
                 }
