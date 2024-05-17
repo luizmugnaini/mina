@@ -42,7 +42,7 @@ namespace mina::dmg {
         //             being caught by the fallthrough.
 
         /// 8-bit registers in little-endian order.
-        enum class Reg8 : u8 {
+        enum struct Reg8 : u8 {
             B      = 0x00,
             C      = 0x01,
             D      = 0x02,
@@ -54,7 +54,7 @@ namespace mina::dmg {
         };
 
         /// 16-bit registers.
-        enum class Reg16 : u8 {
+        enum struct Reg16 : u8 {
             BC = 0x01,
             DE = 0x02,
             HL = 0x03,
@@ -62,7 +62,7 @@ namespace mina::dmg {
         };
 
         /// Register file flags.
-        enum class Flag : u8 {
+        enum struct Flag : u8 {
             /// The carry flag. Set in the following occasions:
             ///     * 8-bit addition is higher than 0xFF.
             ///     * 16-bit addition is higher than 0xFFFF.
@@ -77,7 +77,7 @@ namespace mina::dmg {
         /// Conditional execution.
         ///
         /// Execute the instruction if the corresponding register flag is set.
-        enum class Cond : u8 {
+        enum struct Cond : u8 {
             NZ = 0x01,  ///< Z flag not set.
             Z  = 0x02,  ///< Z flag set.
             NC = 0x03,  ///< C flag not set.
@@ -94,7 +94,7 @@ namespace mina::dmg {
         // CPU instruction opcodes.
         ///////////////////////////////////////////////////////////////////////
 
-        enum class Opcode : u8 {
+        enum struct Opcode : u8 {
             Nop                = 0x00,
             LD_bc_u16          = 0x01,
             LD_bc_ptr_a        = 0x02,
@@ -342,7 +342,7 @@ namespace mina::dmg {
             RST_0x38           = 0xFF,
         };
 
-        enum class CBOpcode {
+        enum struct CBOpcode {
             // TODO(luiz): CB prefixed opcodes
         };
 

@@ -150,7 +150,7 @@ namespace mina::gfx {
         Last         = GLFW_KEY_LAST,
     };
 
-    enum class KeyState {
+    enum struct KeyState {
         Pressed  = GLFW_PRESS,
         Repeat   = GLFW_REPEAT,
         Released = GLFW_RELEASE,
