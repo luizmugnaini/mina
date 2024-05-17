@@ -135,7 +135,7 @@ namespace mina {
     struct VideoRAM {
         static constexpr MemoryRange RANGE{0x8000, 0x9FFF};
 
-        enum class Layer {
+        enum struct Layer {
             Bg,   ///< Background layer.
             Win,  ///< Window layer.
             Obj,  ///< Object layer.

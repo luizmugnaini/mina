@@ -26,7 +26,7 @@
 #include <psh/types.h>
 
 namespace mina::gfx {
-    enum class ShaderCatalog {
+    enum struct ShaderCatalog {
         TriangleVertex,
         TriangleFragment,
         ShaderCatalogCount,
