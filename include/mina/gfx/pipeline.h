@@ -22,7 +22,6 @@
 #pragma once
 
 #include <mina/gfx/context.h>
-#include <psh/string.h>
 #include <psh/types.h>
 
 namespace mina::gfx {

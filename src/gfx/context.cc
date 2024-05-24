@@ -232,7 +232,7 @@ namespace mina::gfx {
                 .pApplicationName   = EMU_NAME.buf,
                 .applicationVersion = VK_MAKE_VERSION(MAJOR_VERSION, MINOR_VERSION, PATCH_VERSION),
                 .pEngineName        = ENGINE_NAME.buf,
-                .apiVersion         = VK_API_VERSION_1_3,
+                .apiVersion         = MINA_VULKAN_API_VERSION,
             };
             VkInstanceCreateInfo instance_info{
                 .sType                   = VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO,

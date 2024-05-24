@@ -269,14 +269,6 @@ add_subdirectory("${THIRDPARTY_DIR}/glfw")
 
 # - Presheaf -
 
-if(CMAKE_BUILD_TYPE STREQUAL "Debug")
-    set(PSH_DEBUG ON)
-    set(PSH_ENABLE_LOGGING ON)
-elseif(CMAKE_BUILD_TYPE STREQUAL "Release")
-    set(PSH_DEBUG OFF)
-    set(PSH_ENABLE_LOGGING OFF)
-endif()
-set(PSH_NAMESPACED_TYPES OFF)
 add_subdirectory("${THIRDPARTY_DIR}/presheaf")
 
 # ------------------------------------------------------------------------------

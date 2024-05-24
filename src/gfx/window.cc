@@ -27,11 +27,7 @@
 
 namespace mina::gfx {
     static void glfw_error_callback(i32 error_code, strptr desc) {
-        psh::log_fmt(
-            psh::LogLevel::Error,
-            "[GLFW] error code: %d, description: %s",
-            error_code,
-            desc);
+        psh_error_fmt("[GLFW] error code: %d, description: %s", error_code, desc);
     }
 
     void Window::init(WindowConfig const& config) noexcept {
