@@ -86,18 +86,15 @@ namespace mina {
 
         switch (load_rom(this, cart_path)) {
             case psh::FileStatus::OK: {
-                psh::log(psh::LogLevel::Info, "Cartridge data successfully loaded.");
+                psh_info("Cartridge data successfully loaded.");
                 break;
             }
             case psh::FileStatus::OutOfMemory: {
-                psh::log_fmt(psh::LogLevel::Fatal, "Not enough memory to read the cartridge data.");
+                psh_fatal_fmt("Not enough memory to read the cartridge data.");
                 return;
             }
             default: {
-                psh::log_fmt(
-                    psh::LogLevel::Fatal,
-                    "Unable to read cartridge data %s",
-                    cart_path.data.buf);
+                psh_fatal_fmt("Unable to read cartridge data %s", cart_path.data.buf);
                 return;
             }
         }

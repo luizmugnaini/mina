@@ -42,7 +42,7 @@ void packed_mem() {
     static_assert(HighRAM::RANGE.start == HwRegisterBank::RANGE.end + 1);
     static_assert(InterruptEnable::RANGE.start == HighRAM::RANGE.end + 1);
 
-    psh::log_fmt(psh::LogLevel::Info, "%s test passed.", __func__);
+    psh_info_fmt("%s test passed.", __func__);
 }
 
 void correct_sizes() {
@@ -66,7 +66,7 @@ void correct_sizes() {
     static_assert(sizeof(InterruptEnable) == 1);
     static_assert(sizeof(MemoryMap) == 0x10000);
 
-    psh::log_fmt(psh::LogLevel::Info, "%s test passed.", __func__);
+    psh_info_fmt("%s test passed.", __func__);
 }
 
 void correct_mem_addr() {
@@ -87,7 +87,7 @@ void correct_mem_addr() {
     psh_assert(offsetof(MemoryMap, hram) == 0xFF80);
     psh_assert(offsetof(MemoryMap, ie) == 0xFFFF);
 
-    psh::log_fmt(psh::LogLevel::Info, "%s test passed.", __func__);
+    psh_info_fmt("%s test passed.", __func__);
 }
 
 void correct_hardware_registers_addr() {
@@ -208,7 +208,7 @@ void correct_hardware_registers_addr() {
 
     psh_assert(offsetof(MemoryMap, reg.unused_0xFF78_to_0xFF7F) == 0xFF78);
 
-    psh::log_fmt(psh::LogLevel::Info, "%s test passed.", __func__);
+    psh_info_fmt("%s test passed.", __func__);
 }
 
 int main() {
@@ -216,5 +216,5 @@ int main() {
     correct_sizes();
     correct_mem_addr();
     correct_hardware_registers_addr();
-    psh::log(psh::LogLevel::Info, "Test passed.");
+    psh_info("Test passed.");
 }
