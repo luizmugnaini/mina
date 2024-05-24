@@ -85,9 +85,9 @@ namespace mina::dmg {
 
 #define cpu_memory(cpu) reinterpret_cast<u8*>(&cpu->mmap)
 
-#define mmap_write_byte(cpu, dst_addr, val_u8)  \
-    do {                                        \
-        *(cpu_memory(cpu) + dst_addr) = val_u8; \
+#define mmap_write_byte(cpu, dst_addr, val_u8)                                      \
+    do {                                                                            \
+        *(cpu_memory(cpu) + static_cast<uptr>(dst_addr)) = static_cast<u8>(val_u8); \
     } while (0)
 
 #define mmap_write_word(cpu, dst_addr, val_u16)              \
