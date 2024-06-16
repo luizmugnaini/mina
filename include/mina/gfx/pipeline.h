@@ -26,21 +26,19 @@
 
 namespace mina::gfx {
     enum struct ShaderCatalog {
-        TriangleVertex,
-        TriangleFragment,
-        ShaderCatalogCount,
+        TRIANGLE_VERTEX,
+        TRIANGLE_FRAGMENT,
+        SHADER_CATALOG_COUNT,
     };
 
-    constexpr strptr shader_path(ShaderCatalog s) noexcept {
-        switch (s) {
-            case ShaderCatalog::TriangleVertex: {
-                return "build/bin/triangle.vert.spv";
-            }
-            case ShaderCatalog::TriangleFragment: {
-                return "build/bin/triangle.frag.spv";
-            }
-            default: psh_unreachable();
+    constexpr strptr shader_path(ShaderCatalog sc) noexcept {
+        strptr s;
+        switch (sc) {
+            case ShaderCatalog::TRIANGLE_VERTEX:   s = "build/bin/triangle.vert.spv"; break;
+            case ShaderCatalog::TRIANGLE_FRAGMENT: s = "build/bin/triangle.frag.spv"; break;
+            default:                              psh_unreachable();
         }
+        return s;
     }
 
     void create_graphics_pipeline(GraphicsContext& ctx) noexcept;

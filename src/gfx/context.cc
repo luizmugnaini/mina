@@ -27,6 +27,7 @@
 #include <mina/gfx/utils.h>
 #include <mina/gfx/vma.h>
 #include <mina/meta/info.h>
+#include <psh/algorithms.h>
 #include <psh/arena.h>
 #include <psh/dyn_array.h>
 #include <psh/intrinsics.h>
@@ -103,10 +104,7 @@ namespace mina::gfx {
                 }
 
                 if (!found) {
-                    log_fmt(
-                        psh::LogLevel::Debug,
-                        "Vulkan physical device extension '%s' not found.",
-                        ext);
+                    psh_debug_fmt("Vulkan physical device extension '%s' not found.", ext);
                     return false;
                 }
             }
@@ -138,11 +136,10 @@ namespace mina::gfx {
                 query_swap_chain_info(arena, pdev, ctx.surf, swc_info);
 
                 // Check requirements.
-                bool const supports_geom = (feats.geometryShader == VK_TRUE);
-                bool const has_exts =
-                    physical_device_has_extensions(arena->make_scratch(), pdev, exts);
-                bool const has_all_queue_fams = qfq.has_all();
-                bool const minimal_swc =
+                bool supports_geom = (feats.geometryShader == VK_TRUE);
+                bool has_exts = physical_device_has_extensions(arena->make_scratch(), pdev, exts);
+                bool has_all_queue_fams = qfq.has_all();
+                bool minimal_swc =
                     !(swc_info.surf_fmt.is_empty() || swc_info.pres_modes.is_empty());
 
                 // NOTE: It is likely that the first device will be the one selected.
@@ -179,7 +176,7 @@ namespace mina::gfx {
             }
 
             psh::Array<f32> priorities{sarena.arena, uidx.size};
-            priorities.fill(1.0f);
+            psh::fill(psh::fat_ptr(priorities), 1.0f);
 
             // Construct all device queue family informations.
             psh::Array<VkDeviceQueueCreateInfo> dev_queue_info{sarena.arena, uidx.size};
@@ -208,7 +205,7 @@ namespace mina::gfx {
 
             // Get GLFW required extensions.
             u32                   glfw_ext_count = 0;
-            strptr* const         glfw_ext = glfwGetRequiredInstanceExtensions(&glfw_ext_count);
+            strptr*               glfw_ext = glfwGetRequiredInstanceExtensions(&glfw_ext_count);
             psh::DynArray<strptr> required_extensions{
                 psh::FatPtr<strptr const>{glfw_ext, glfw_ext_count},
                 sarena.arena,
@@ -224,7 +221,7 @@ namespace mina::gfx {
 #endif  // MINA_VULKAN_DEBUG
 
             psh_assert_msg(
-                has_required_extensions(sarena.decouple(), required_extensions.const_fat_ptr()),
+                           has_required_extensions(sarena.decouple(), psh::const_fat_ptr(required_extensions)),
                 "Unable to find all required Vulkan extensions");
 
             VkApplicationInfo const app_info{
@@ -271,7 +268,7 @@ namespace mina::gfx {
                 ctx.dbg_msg));
 #endif  // MINA_VULKAN_DEBUG
         }
-    }  // namespace
+    }   // namespace
 
     void init_graphics_context(GraphicsContext& ctx, GraphicsContextConfig const& config) noexcept {
         ctx.persistent_arena = config.persistent_arena;
@@ -291,10 +288,10 @@ namespace mina::gfx {
         SwapChainInfo                    swc_info{};
         constexpr psh::Buffer<strptr, 2> pdev_ext{"VK_KHR_swapchain", "VK_EXT_memory_budget"};
         psh_assert_msg(
-            select_physical_dev(ctx, sarena.arena, pdev_ext.const_fat_ptr(), swc_info),
+                       select_physical_dev(ctx, sarena.arena, psh::const_fat_ptr(pdev_ext), swc_info),
             "Failed to find an adequate physical device for the Vulkan graphics context.");
 
-        create_logical_device(ctx, pdev_ext.const_fat_ptr());
+        create_logical_device(ctx, psh::const_fat_ptr(pdev_ext));
 
         // Setup queues.
         {

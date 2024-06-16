@@ -89,7 +89,7 @@ namespace mina {
                 psh_info("Cartridge data successfully loaded.");
                 break;
             }
-            case psh::FileStatus::OutOfMemory: {
+            case psh::FileStatus::OUT_OF_MEMORY: {
                 psh_fatal_fmt("Not enough memory to read the cartridge data.");
                 return;
             }

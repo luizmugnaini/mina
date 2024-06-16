@@ -21,7 +21,7 @@
 
 #pragma once
 
-#include <mina/cart.h>
+#include <mina/cartridge.h>
 #include <psh/mem_utils.h>
 #include <psh/types.h>
 

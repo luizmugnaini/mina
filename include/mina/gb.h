@@ -21,7 +21,7 @@
 
 #pragma once
 
-#include <mina/cart.h>
+#include <mina/cartridge.h>
 #include <mina/cpu/dmg.h>
 #include <mina/gfx/context.h>
 #include <mina/memory_map.h>

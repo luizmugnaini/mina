@@ -46,7 +46,7 @@ namespace mina::gfx {
             }
 
             if (!found) {
-                psh::log_fmt(psh::LogLevel::Debug, "Vulkan validation layer '%s' not found", l);
+                psh_debug_fmt("Vulkan validation layer '%s' not found", l);
                 return false;
             }
         }
@@ -72,7 +72,7 @@ namespace mina::gfx {
             }
 
             if (!found) {
-                psh::log_fmt(psh::LogLevel::Debug, "Vulkan extension '%s' not found", e);
+                psh_debug_fmt("Vulkan extension '%s' not found", e);
                 return false;
             }
         }
@@ -117,8 +117,7 @@ namespace mina::gfx {
                 break;
             }
             case VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT: {
-                psh::log_fmt(
-                    psh::LogLevel::Warning,
+                psh_warning_fmt(
                     "[Vulkan][%s] type: %s, message: %s.",
                     "WARNING",
                     debug_msg_type_str(type),
@@ -126,8 +125,7 @@ namespace mina::gfx {
                 break;
             }
             case VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT: {
-                psh::log_fmt(
-                    psh::LogLevel::Error,
+                psh_error_fmt(
                     "[Vulkan][%s] type: %s, message: %s.",
                     "ERROR",
                     debug_msg_type_str(type),
@@ -149,7 +147,7 @@ namespace mina::gfx {
 
         VkResult res;
         if (dum_create_fn == nullptr) {
-            psh::log(psh::LogLevel::Error, "Unable to load proc vkCreateDebugUtilsMessengerEXT");
+            psh_error("Unable to load proc vkCreateDebugUtilsMessengerEXT");
             res = VK_ERROR_EXTENSION_NOT_PRESENT;
         } else {
             res = dum_create_fn(instance, &dbg_msg_info, alloc_cb, &dum);
@@ -165,9 +163,7 @@ namespace mina::gfx {
         auto* const dum_destroy_fn = reinterpret_cast<PFN_vkDestroyDebugUtilsMessengerEXT>(
             vkGetInstanceProcAddr(instance, "vkDestroyDebugUtilsMessengerEXT"));
         if (dum_destroy_fn == nullptr) {
-            psh::log(
-                psh::LogLevel::Error,
-                "Unable to load the proc vkDestroyDebugUtilsMessengerEXT.");
+            psh_error("Unable to load the proc vkDestroyDebugUtilsMessengerEXT.");
         } else {
             dum_destroy_fn(instance, dum, alloc_cb);
         }

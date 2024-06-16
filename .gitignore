@@ -11,3 +11,8 @@
 
 # RemedyBG
 *.rdbg
+
+# Universal CTags
+.ctags.d
+.tags
+tags

@@ -362,7 +362,7 @@ namespace mina::gfx {
             recreate_swap_chain(ctx);
         } else if (res != VK_SUCCESS) {
             // TODO: proper error handling.
-            log_fmt(psh::LogLevel::Error, "Unable to present swap chain image");
+            psh_error("Unable to present swap chain image");
             success = false;
         }
 

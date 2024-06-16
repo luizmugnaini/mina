@@ -65,29 +65,34 @@ namespace mina::gfx {
             };
 
             vkCmdBeginRenderPass(buf, &pass_begin_info, VK_SUBPASS_CONTENTS_INLINE);
-            psh_defer(vkCmdEndRenderPass(buf));
+            {
+                vkCmdBindPipeline(
+                    buf,
+                    VK_PIPELINE_BIND_POINT_GRAPHICS,
+                    ctx.pipelines.graphics.handle);
 
-            vkCmdBindPipeline(buf, VK_PIPELINE_BIND_POINT_GRAPHICS, ctx.pipelines.graphics.handle);
+                VkViewport const dyn_viewport{
+                    .x        = 0.0f,
+                    .y        = 0.0f,
+                    .width    = static_cast<f32>(ctx.swap_chain.extent.width),
+                    .height   = static_cast<f32>(ctx.swap_chain.extent.height),
+                    .minDepth = 0.0f,
+                    .maxDepth = 1.0f,
+                };
+                vkCmdSetViewport(buf, 0, 1, &dyn_viewport);
 
-            VkViewport const dyn_viewport{
-                .x        = 0.0f,
-                .y        = 0.0f,
-                .width    = static_cast<f32>(ctx.swap_chain.extent.width),
-                .height   = static_cast<f32>(ctx.swap_chain.extent.height),
-                .minDepth = 0.0f,
-                .maxDepth = 1.0f,
-            };
-            vkCmdSetViewport(buf, 0, 1, &dyn_viewport);
+                VkRect2D const dyn_scissors{
+                    .offset = {0, 0},
+                    .extent = ctx.swap_chain.extent,
+                };
+                vkCmdSetScissor(buf, 0, 1, &dyn_scissors);
 
-            VkRect2D const dyn_scissors{
-                .offset = {0, 0},
-                .extent = ctx.swap_chain.extent,
-            };
-            vkCmdSetScissor(buf, 0, 1, &dyn_scissors);
-
-            constexpr u32 num_vertices  = 3;
-            constexpr u32 num_instances = 1;
-            vkCmdDraw(buf, num_vertices, num_instances, 0, 0);
+                // TODO: this is completely hard coded. Remove this ASAP.
+                constexpr u32 num_vertices  = 3;
+                constexpr u32 num_instances = 1;
+                vkCmdDraw(buf, num_vertices, num_instances, 0, 0);
+            }
+            vkCmdEndRenderPass(buf);
         }
         mina_vk_assert_msg(vkEndCommandBuffer(buf), "Failed to record commands to the buffer");
     }

@@ -1,0 +1,15 @@
+-o
+tags
+-L
+.ctags
+--languages=c,c++
+--kinds-all=*
+--fields=N,P,E,S,Z,a,i,m,n,o,r,t,s
+--extras=*
+--recurse
+src/
+thirdparty/presheaf/include/
+thirdparty/presheaf/src/
+thirdparty/glfw/include/
+thirdparty/glfw/src/
+thirdparty/VulkanMemoryAllocator/include/vk_mem_alloc.h

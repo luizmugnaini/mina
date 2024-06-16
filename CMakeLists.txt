@@ -87,26 +87,24 @@ set(
     "-Wswitch"
     "-Wcovered-switch-default"
     "-Wshadow"
-    "-Wnon-virtual-dtor"
     "-Wold-style-cast"
     "-Wcast-align"
     "-Wunused"
-    "-Woverloaded-virtual"
     "-Wpedantic"
     "-Wconversion"
     "-Wsign-conversion"
     "-Wnull-dereference"
     "-Wdouble-promotion"
     "-Wmisleading-indentation"
+    "-Wformat=2"
+
+    "-Wno-sometimes-uninitialized" # Annoying for partial switch cases...
+
     "-fno-rtti"
     "-fno-exceptions"
     "-fno-cxx-exceptions"
     "-fcolor-diagnostics"
     "-fno-force-emit-vtables"
-    # Don't warn about non-literal format strings.
-    # TODO: we should use -Wformat=2
-    # "-Wno-format-security"
-    # "-Wno-format-nonliteral"
 
 )
 
@@ -149,10 +147,8 @@ set(
     "-Wswitch"
     "-Wcovered-switch-default"
     "-Wshadow"
-    "-Wnon-virtual-dtor"
     "-Wold-style-cast"
     "-Wunused"
-    "-Woverloaded-virtual"
     "-Wpedantic"
     "-Wconversion"
     "-Wsign-conversion"
@@ -160,13 +156,9 @@ set(
     "-Wdouble-promotion"
     "-Wmisleading-indentation"
     "-Wcast-align"
-    "-Wno-cast-align"
-    "-Wno-language-extension-token"
+    "-Wformat=2"
 
-    # Don't warn about non-literal format strings.
-    # TODO: we should use -Wformat=2
-    "-Wno-format-security"
-    "-Wno-format-nonliteral"
+    "-Wno-sometimes-uninitialized" # Annoying for partial switch cases...
 )
 
 # ------------------------------------------------------------------------------
@@ -278,7 +270,7 @@ add_subdirectory("${THIRDPARTY_DIR}/presheaf")
 set(
     MINA_ENGINE_SRC
     "${CMAKE_SOURCE_DIR}/src/gb.cc"
-    "${CMAKE_SOURCE_DIR}/src/cart.cc"
+    "${CMAKE_SOURCE_DIR}/src/cartridge.cc"
     "${CMAKE_SOURCE_DIR}/src/memory_map.cc"
     "${CMAKE_SOURCE_DIR}/src/cpu/dmg.cc"
     "${CMAKE_SOURCE_DIR}/src/gfx/command.cc"
@@ -340,7 +332,7 @@ target_include_directories(mina_lib PUBLIC "${CMAKE_SOURCE_DIR}/include")
 add_executable(mina ${MINA_EXE_SRC} ${MINA_ENGINE_SRC})
 target_compile_options(mina PUBLIC ${MINA_CXX_FLAGS} ${MINA_CXX_SAN_FLAGS})
 target_link_libraries(
-    mina 
+    mina
     PUBLIC ${MINA_CXX_SAN_FLAGS}
         Vulkan::Vulkan
         VulkanMemoryAllocator

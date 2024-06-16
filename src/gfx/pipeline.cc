@@ -39,8 +39,7 @@ namespace mina::gfx {
         VkShaderModule sm;
         if (vkCreateShaderModule(dev, &sm_info, nullptr, &sm) != VK_SUCCESS) {
             sm = nullptr;
-            log_fmt(
-                psh::LogLevel::Error,
+            psh_error_fmt(
                 "Couldn't make shader module for shader:\n%s",
                 shader_src.data.buf);
         }
@@ -109,9 +108,9 @@ namespace mina::gfx {
         auto sarena = ctx.work_arena->make_scratch();
 
         psh::FileReadResult vert =
-            psh::read_file(sarena.arena, shader_path(ShaderCatalog::TriangleVertex));
+            psh::read_file(sarena.arena, shader_path(ShaderCatalog::TRIANGLE_VERTEX), psh::ReadFileFlag::READ_BIN);
         psh::FileReadResult frag =
-            psh::read_file(sarena.arena, shader_path(ShaderCatalog::TriangleFragment));
+            psh::read_file(sarena.arena, shader_path(ShaderCatalog::TRIANGLE_FRAGMENT), psh::ReadFileFlag::READ_BIN);
         psh_assert(vert.status == psh::FileStatus::OK && frag.status == psh::FileStatus::OK);
 
         // Shader modules.

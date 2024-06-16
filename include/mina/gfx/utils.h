@@ -31,7 +31,7 @@
             VkResult vkres = (res);                                                    \
             if (vkres != VK_SUCCESS) {                                                 \
                 psh_fatal_fmt(psh::ASSERT_FMT, #res, "Vulkan operation unsuccessful"); \
-                psh::abort_program();                                                  \
+                psh_abort();                                                  \
             }                                                                          \
         } while (0)
 #    define mina_vk_assert_msg(res, msg)                     \
@@ -39,7 +39,7 @@
             VkResult vkres = (res);                          \
             if (vkres != VK_SUCCESS) {                       \
                 psh_fatal_fmt(psh::ASSERT_FMT, #res, (msg)); \
-                psh::abort_program();                        \
+                psh_abort();                        \
             }                                                \
         } while (0)
 #else

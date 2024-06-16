@@ -25,10 +25,12 @@
 
 #include <mina/gb.h>
 #include <psh/assert.h>
-#include <psh/io.h>
+#include <psh/types.h>
+
+constexpr usize MAX_PATH_LEN = 124;
 
 // TODO: accept path from input instead of hard-coding it.
-int main() {
+int main(i32 argc, strptr argv[]) {
     mina::GameBoy gb{};
     gb.run(psh_string_view("ignore/roms/drmario.gb"));
     return 0;
