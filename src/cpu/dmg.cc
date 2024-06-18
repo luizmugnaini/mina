@@ -38,7 +38,7 @@ namespace mina::dmg {
             E      = 0x03,
             H      = 0x04,
             L      = 0x05,
-            HL_ptr = 0x06,
+            HL_PTR = 0x06,
             A      = 0x07,
         };
 
@@ -147,7 +147,7 @@ namespace mina::dmg {
 
         u8 read_reg8(CPU* cpu, Reg8 reg) noexcept {
             u8 val;
-            if (reg == Reg8::HL_ptr) {
+            if (reg == Reg8::HL_PTR) {
                 val = bus_read_byte(cpu, read_reg16(cpu, Reg16::HL));
             } else if (reg == Reg8::A) {
                 val = cpu->regfile.a;
@@ -158,7 +158,7 @@ namespace mina::dmg {
         }
 
         void set_reg8(CPU* cpu, Reg8 reg, u8 val) noexcept {
-            if (reg == Reg8::HL_ptr) {
+            if (reg == Reg8::HL_PTR) {
                 u8* memory       = cpu_memory(cpu);
                 u16 addr         = read_reg16(cpu, Reg16::HL);
                 *(memory + addr) = val;
@@ -320,119 +320,128 @@ namespace mina::dmg {
                     psh_todo_msg("continue BIT op");
                     break;
                 }
-                case CBPrefixed::RES:
-                case CBPrefixed::SET: break;
+                // TODO(luiz): implement RES and SET.
+                case CBPrefixed::RES: psh_todo_msg("CB RES");
+                case CBPrefixed::SET: psh_todo_msg("CB SET");
             }
         }
 
         void dexec(CPU* cpu, u8 data) noexcept {
-            auto opcode = static_cast<Opcode>(data);
-            u8   y      = psh_bits_at(data, 3, 3);
-            u8   p      = psh_bits_at(y, 1, 2);
-            u8   z      = psh_bits_at(data, 0, 3);
+            Opcode op = static_cast<Opcode>(data);
 
-            switch (opcode) {
-                case Opcode::Nop: {
-                    break;
-                }
+            // Strip information out of the opcode byte.
+            u8 y = psh_bits_at(data, 3, 3);
+            u8 p = psh_bits_at(y, 1, 2);
+            u8 z = psh_bits_at(data, 0, 3);
 
-                case Opcode::HALT: {  // NOTE(luiz): Only exception, load [HL] [HL] causes a halt.
-                                      // WARN(luiz): Don't change halt position with respect to LD
-                                      // R8 R8
-                    psh_todo_msg("HALT");
-                }
-                case Opcode::LD_b_b:
-                case Opcode::LD_b_c:
-                case Opcode::LD_b_d:
-                case Opcode::LD_b_e:
-                case Opcode::LD_b_h:
-                case Opcode::LD_b_l:
-                case Opcode::LD_b_hl_ptr:
-                case Opcode::LD_b_a:
-                case Opcode::LD_c_b:
-                case Opcode::LD_c_c:
-                case Opcode::LD_c_d:
-                case Opcode::LD_c_e:
-                case Opcode::LD_c_h:
-                case Opcode::LD_c_l:
-                case Opcode::LD_c_hl_ptr:
-                case Opcode::LD_c_a:
-                case Opcode::LD_d_b:
-                case Opcode::LD_d_c:
-                case Opcode::LD_d_d:
-                case Opcode::LD_d_e:
-                case Opcode::LD_d_h:
-                case Opcode::LD_d_l:
-                case Opcode::LD_d_hl_ptr:
-                case Opcode::LD_d_a:
-                case Opcode::LD_e_b:
-                case Opcode::LD_e_c:
-                case Opcode::LD_e_d:
-                case Opcode::LD_e_e:
-                case Opcode::LD_e_h:
-                case Opcode::LD_e_l:
-                case Opcode::LD_e_hl_ptr:
-                case Opcode::LD_e_a:
-                case Opcode::LD_h_b:
-                case Opcode::LD_h_c:
-                case Opcode::LD_h_d:
-                case Opcode::LD_h_e:
-                case Opcode::LD_h_h:
-                case Opcode::LD_h_l:
-                case Opcode::LD_h_hl_ptr:
-                case Opcode::LD_h_a:
-                case Opcode::LD_l_b:
-                case Opcode::LD_l_c:
-                case Opcode::LD_l_d:
-                case Opcode::LD_l_e:
-                case Opcode::LD_l_h:
-                case Opcode::LD_l_l:
-                case Opcode::LD_l_hl_ptr:
-                case Opcode::LD_l_a:
-                case Opcode::LD_hl_ptr_b:
-                case Opcode::LD_hl_ptr_c:
-                case Opcode::LD_hl_ptr_d:
-                case Opcode::LD_hl_ptr_e:
-                case Opcode::LD_hl_ptr_h:
-                case Opcode::LD_hl_ptr_l:
-                case Opcode::LD_hl_ptr_a:
-                case Opcode::LD_a_b:
-                case Opcode::LD_a_c:
-                case Opcode::LD_a_d:
-                case Opcode::LD_a_e:
-                case Opcode::LD_a_h:
-                case Opcode::LD_a_l:
-                case Opcode::LD_a_hl_ptr:
-                case Opcode::LD_a_a:      {
+            switch (op) {
+                // Do nothing.
+                case Opcode::NOP:         break;
+
+                // Halt is caused by a LD [HL] [HL] instruction.
+                //
+                // NOTE(luiz): Please, do not change the the position of this instruction case with
+                //             respect to the below LD R8 R8 instructions as it'll be the only
+                //             exception to the pattern.
+                case Opcode::HALT:        psh_todo_msg("HALT");
+                case Opcode::LD_B_B:
+                case Opcode::LD_B_C:
+                case Opcode::LD_B_D:
+                case Opcode::LD_B_E:
+                case Opcode::LD_B_H:
+                case Opcode::LD_B_L:
+                case Opcode::LD_B_HL_PTR:
+                case Opcode::LD_B_A:
+                case Opcode::LD_C_B:
+                case Opcode::LD_C_C:
+                case Opcode::LD_C_D:
+                case Opcode::LD_C_E:
+                case Opcode::LD_C_H:
+                case Opcode::LD_C_L:
+                case Opcode::LD_C_HL_PTR:
+                case Opcode::LD_C_A:
+                case Opcode::LD_D_B:
+                case Opcode::LD_D_C:
+                case Opcode::LD_D_D:
+                case Opcode::LD_D_E:
+                case Opcode::LD_D_H:
+                case Opcode::LD_D_L:
+                case Opcode::LD_D_HL_PTR:
+                case Opcode::LD_D_A:
+                case Opcode::LD_E_B:
+                case Opcode::LD_E_C:
+                case Opcode::LD_E_D:
+                case Opcode::LD_E_E:
+                case Opcode::LD_E_H:
+                case Opcode::LD_E_L:
+                case Opcode::LD_E_HL_PTR:
+                case Opcode::LD_E_A:
+                case Opcode::LD_H_B:
+                case Opcode::LD_H_C:
+                case Opcode::LD_H_D:
+                case Opcode::LD_H_E:
+                case Opcode::LD_H_H:
+                case Opcode::LD_H_L:
+                case Opcode::LD_H_HL_PTR:
+                case Opcode::LD_H_A:
+                case Opcode::LD_L_B:
+                case Opcode::LD_L_C:
+                case Opcode::LD_L_D:
+                case Opcode::LD_L_E:
+                case Opcode::LD_L_H:
+                case Opcode::LD_L_L:
+                case Opcode::LD_L_HL_PTR:
+                case Opcode::LD_L_A:
+                case Opcode::LD_HL_PTR_B:
+                case Opcode::LD_HL_PTR_C:
+                case Opcode::LD_HL_PTR_D:
+                case Opcode::LD_HL_PTR_E:
+                case Opcode::LD_HL_PTR_H:
+                case Opcode::LD_HL_PTR_L:
+                case Opcode::LD_HL_PTR_A:
+                case Opcode::LD_A_B:
+                case Opcode::LD_A_C:
+                case Opcode::LD_A_D:
+                case Opcode::LD_A_E:
+                case Opcode::LD_A_H:
+                case Opcode::LD_A_L:
+                case Opcode::LD_A_HL_PTR:
+                case Opcode::LD_A_A:      {
                     set_reg8(cpu, static_cast<Reg8>(y), read_reg8(cpu, static_cast<Reg8>(z)));
                     break;
                 }
 
-                case Opcode::LD_b_u8:
-                case Opcode::LD_c_u8:
-                case Opcode::LD_d_u8:
-                case Opcode::LD_e_u8:
-                case Opcode::LD_h_u8:
-                case Opcode::LD_l_u8:
-                case Opcode::LD_hl_ptr_u8:
-                case Opcode::LD_a_u8:      {
+                // Load the unsigned immediate 8-bit value to the given 8-bit register.
+                case Opcode::LD_B_U8:
+                case Opcode::LD_C_U8:
+                case Opcode::LD_D_U8:
+                case Opcode::LD_E_U8:
+                case Opcode::LD_H_U8:
+                case Opcode::LD_L_U8:
+                case Opcode::LD_HL_PTR_U8:
+                case Opcode::LD_A_U8:      {
                     set_reg8(cpu, static_cast<Reg8>(y), bus_read_imm8(cpu));
                     break;
                 }
 
-                case Opcode::LD_bc_u16:
-                case Opcode::LD_de_u16:
-                case Opcode::LD_hl_u16:
-                case Opcode::LD_sp_u16: {
+                // Load the unsigned immediate 16-bit value to the given 16-bit register.
+                case Opcode::LD_BC_U16:
+                case Opcode::LD_DE_U16:
+                case Opcode::LD_HL_U16:
+                case Opcode::LD_SP_U16: {
                     set_reg16(cpu, static_cast<Reg16>(p), bus_read_imm16(cpu));
                     break;
                 }
-                case Opcode::LD_sp_hl: {
+
+                // Load the value of the HL register to the stack pointer.
+                case Opcode::LD_SP_HL: {
                     set_reg16(cpu, Reg16::SP, read_reg16(cpu, Reg16::HL));
                     break;
                 }
 
-                case Opcode::LD_hl_sp_plus_i8: {
+                // Load the result of the addition of the stack pointer and the signed immediate
+                // 8-bit value to the HL register.
+                case Opcode::LD_HL_SP_PLUS_I8: {
                     i8  offset = static_cast<i8>(bus_read_imm8(cpu));
                     u16 sp     = read_reg16(cpu, Reg16::SP);
                     u32 res    = static_cast<u32>(sp + offset);
@@ -449,32 +458,43 @@ namespace mina::dmg {
                     break;
                 }
 
-                case Opcode::LD_bc_ptr_a: {
+                // Load the value of the accumulator register to the byte whose address is given by
+                // the 16-bit register BC.
+                case Opcode::LD_BC_PTR_A: {
                     mmap_write_byte(cpu, read_reg16(cpu, Reg16::BC), cpu->regfile.a);
                     break;
                 }
 
-                case Opcode::LD_u16_ptr_sp: {
+                // Load the value of the stack pointer to the byte whose address is given by the
+                // unsigned immediate 16-bit value.
+                case Opcode::LD_U16_PTR_SP: {
                     mmap_write_word(cpu, bus_read_imm16(cpu), read_reg16(cpu, Reg16::SP));
                     break;
                 }
-                case Opcode::LD_u16_ptr_a: {
+
+                // Load the value of the accumulator register to the byte whose address is given by
+                // the unsigned immediate 16-bit value.
+                case Opcode::LD_U16_PTR_A: {
                     mmap_write_byte(cpu, bus_read_imm16(cpu), cpu->regfile.a);
                     break;
                 }
-                case Opcode::LD_a_u16_ptr: {
+
+                // Load the value of the byte whose address is given by the unsigned immediate
+                // 16-bit value to the accumulator register.
+                case Opcode::LD_A_U16_PTR: {
                     cpu->regfile.a = bus_read_byte(cpu, bus_read_imm16(cpu));
                     break;
                 }
 
-                case Opcode::LDH_u16_ptr_a: {
+                case Opcode::LDH_U16_PTR_A: {
                     u16 addr = bus_read_imm16(cpu);
                     if (0xFF00 <= addr) {
                         mmap_write_byte(cpu, addr, cpu->regfile.a);
                     }
                     break;
                 }
-                case Opcode::LDH_a_u16_ptr: {
+
+                case Opcode::LDH_A_U16_PTR: {
                     u16 addr = bus_read_imm16(cpu);
                     if (0xFF00 <= addr) {
                         u8 const* memory = cpu_memory(cpu);
@@ -483,63 +503,68 @@ namespace mina::dmg {
                     break;
                 }
 
-                case Opcode::LD_a_bc_ptr: {
+                case Opcode::LD_A_BC_PTR: {
                     cpu->regfile.a = bus_read_byte(cpu, read_reg16(cpu, Reg16::BC));
                     break;
                 }
-                case Opcode::LD_a_de_ptr: {
+                case Opcode::LD_A_DE_PTR: {
                     cpu->regfile.a = bus_read_byte(cpu, read_reg16(cpu, Reg16::DE));
                     break;
                 }
-                case Opcode::LD_de_ptr_a: {
+
+                case Opcode::LD_DE_PTR_A: {
                     mmap_write_byte(cpu, read_reg16(cpu, Reg16::DE), cpu->regfile.a);
                     break;
                 }
 
-                case Opcode::LDI_hl_ptr_a: {
+                case Opcode::LDI_HL_PTR_A: {
                     u16 hl = read_reg16(cpu, Reg16::HL);
                     mmap_write_byte(cpu, hl, cpu->regfile.a);
                     set_reg16(cpu, Reg16::HL, hl + 1);
                     break;
                 }
-                case Opcode::LDD_hl_ptr_a: {
+                case Opcode::LDD_HL_PTR_A: {
                     u16 hl = read_reg16(cpu, Reg16::HL);
                     mmap_write_byte(cpu, hl, cpu->regfile.a);
                     set_reg16(cpu, Reg16::HL, hl - 1);
                     break;
                 }
-                case Opcode::LDI_a_hl_ptr: {
+                case Opcode::LDI_A_HL_PTR: {
                     u16 hl         = read_reg16(cpu, Reg16::HL);
                     cpu->regfile.a = bus_read_byte(cpu, hl);
                     set_reg16(cpu, Reg16::HL, hl + 1);
                     break;
                 }
-                case Opcode::LDD_a_hl_ptr: {
+                case Opcode::LDD_A_HL_PTR: {
                     u16 hl         = read_reg16(cpu, Reg16::HL);
                     cpu->regfile.a = bus_read_byte(cpu, hl);
                     set_reg16(cpu, Reg16::HL, hl - 1);
                     break;
                 }
 
-                case Opcode::LD_0xFF00_plus_c_a: {
+                case Opcode::LD_0xFF00_PLUS_C_A: {
                     mmap_write_byte(cpu, 0xFF00 + cpu->regfile.c, cpu->regfile.a);
                     break;
                 }
-                case Opcode::LD_a_0xFF00_plus_c: {
+                case Opcode::LD_A_0xFF00_PLUS_C: {
                     cpu->regfile.a = *(cpu_memory(cpu) + 0xFF00 + cpu->regfile.c);
                     break;
                 }
 
-                case Opcode::JR_i8: {
+                // Jump the program counter relative to its current position by a signed immediate
+                // 8-bit value.
+                case Opcode::JR_I8: {
                     i8 rel_addr = static_cast<i8>(bus_read_imm16(cpu));
                     cpu->regfile.pc += rel_addr;
                     break;
                 }
 
-                case Opcode::JR_nz_i8:
-                case Opcode::JR_z_i8:
-                case Opcode::JR_nc_i8:
-                case Opcode::JR_c_i8:  {
+                // Conditionally jump the program counter relative to its current position by a
+                // signed immediate 8-bit value.
+                case Opcode::JR_NZ_I8:
+                case Opcode::JR_Z_I8:
+                case Opcode::JR_NC_I8:
+                case Opcode::JR_C_I8:  {
                     Cond cc = static_cast<Cond>(y - 4);
                     if (read_condition_flag(cpu, cc)) {
                         i8 rel_addr = static_cast<i8>(bus_read_imm16(cpu));
@@ -548,20 +573,25 @@ namespace mina::dmg {
                     break;
                 }
 
-                case Opcode::JP_hl: {
+                // Jump the program counter to the address given by the 16-bit register HL.
+                case Opcode::JP_HL: {
                     cpu->regfile.pc = read_reg16(cpu, Reg16::HL);
                     break;
                 }
 
-                case Opcode::JP_u16: {
+                // Jump the program counter to the address given by an unsigned immediate 8-bit
+                // value.
+                case Opcode::JP_U16: {
                     cpu->regfile.pc = bus_read_imm16(cpu);
                     break;
                 }
 
-                case Opcode::JP_nz_u16:
-                case Opcode::JP_z_u16:
-                case Opcode::JP_nc_u16:
-                case Opcode::JP_c_u16:  {
+                // Conditionally jump the program counter to the address given by an unsigned
+                // immediate 16-bit value.
+                case Opcode::JP_NZ_U16:
+                case Opcode::JP_Z_U16:
+                case Opcode::JP_NC_U16:
+                case Opcode::JP_C_U16:  {
                     Cond cc = static_cast<Cond>(y);
                     if (read_condition_flag(cpu, cc)) {
                         cpu->regfile.pc = bus_read_imm16(cpu);
@@ -569,14 +599,15 @@ namespace mina::dmg {
                     break;
                 }
 
-                case Opcode::INC_b:
-                case Opcode::INC_c:
-                case Opcode::INC_d:
-                case Opcode::INC_e:
-                case Opcode::INC_h:
-                case Opcode::INC_l:
-                case Opcode::INC_hl_ptr:
-                case Opcode::INC_a:      {
+                // Increment a given 8-bit register.
+                case Opcode::INC_B:
+                case Opcode::INC_C:
+                case Opcode::INC_D:
+                case Opcode::INC_E:
+                case Opcode::INC_H:
+                case Opcode::INC_L:
+                case Opcode::INC_HL_PTR:
+                case Opcode::INC_A:      {
                     Reg8 reg      = static_cast<Reg8>(y);
                     u8   prev_val = read_reg8(cpu, reg);
                     set_reg8(cpu, reg, prev_val + 1);
@@ -587,23 +618,25 @@ namespace mina::dmg {
                     break;
                 }
 
-                case Opcode::INC_bc:
-                case Opcode::INC_de:
-                case Opcode::INC_hl:
-                case Opcode::INC_sp: {
+                // Increment a given 16-bit register.
+                case Opcode::INC_BC:
+                case Opcode::INC_DE:
+                case Opcode::INC_HL:
+                case Opcode::INC_SP: {
                     Reg16 reg = static_cast<Reg16>(p);
                     set_reg16(cpu, reg, read_reg16(cpu, reg) + 1);
                     break;
                 }
 
-                case Opcode::DEC_b:
-                case Opcode::DEC_c:
-                case Opcode::DEC_d:
-                case Opcode::DEC_e:
-                case Opcode::DEC_h:
-                case Opcode::DEC_l:
-                case Opcode::DEC_hl_ptr:
-                case Opcode::DEC_a:      {
+                // Decrement a given 8-bit register.
+                case Opcode::DEC_B:
+                case Opcode::DEC_C:
+                case Opcode::DEC_D:
+                case Opcode::DEC_E:
+                case Opcode::DEC_H:
+                case Opcode::DEC_L:
+                case Opcode::DEC_HL_PTR:
+                case Opcode::DEC_A:      {
                     Reg8 reg      = static_cast<Reg8>(y);
                     u8   prev_val = read_reg8(cpu, reg);
                     set_reg8(cpu, reg, prev_val - 1);
@@ -614,23 +647,25 @@ namespace mina::dmg {
                     break;
                 }
 
-                case Opcode::DEC_bc:
-                case Opcode::DEC_de:
-                case Opcode::DEC_hl:
-                case Opcode::DEC_sp: {
+                // Decremement a given 16-bit register.
+                case Opcode::DEC_BC:
+                case Opcode::DEC_DE:
+                case Opcode::DEC_HL:
+                case Opcode::DEC_SP: {
                     Reg16 reg = static_cast<Reg16>(p);
                     set_reg16(cpu, reg, read_reg16(cpu, reg) - 1);
                     break;
                 }
 
-                case Opcode::ADD_a_b:
-                case Opcode::ADD_a_c:
-                case Opcode::ADD_a_d:
-                case Opcode::ADD_a_e:
-                case Opcode::ADD_a_h:
-                case Opcode::ADD_a_l:
-                case Opcode::ADD_a_hl_ptr:
-                case Opcode::ADD_a_a:      {
+                // Add the value contained in an 8-bit register to the accumulator register.
+                case Opcode::ADD_A_B:
+                case Opcode::ADD_A_C:
+                case Opcode::ADD_A_D:
+                case Opcode::ADD_A_E:
+                case Opcode::ADD_A_H:
+                case Opcode::ADD_A_L:
+                case Opcode::ADD_A_HL_PTR:
+                case Opcode::ADD_A_A:      {
                     Reg8 reg       = static_cast<Reg8>(z);
                     u8   val       = read_reg8(cpu, reg);
                     u8   acc       = cpu->regfile.a;
@@ -644,7 +679,8 @@ namespace mina::dmg {
                     break;
                 }
 
-                case Opcode::ADD_a_u8: {
+                // Add an unsigned immediate 8-bit value to the accumulator register.
+                case Opcode::ADD_A_U8: {
                     u8  val        = bus_read_imm8(cpu);
                     u8  acc        = cpu->regfile.a;
                     u16 res        = static_cast<u16>(acc + val);
@@ -657,7 +693,8 @@ namespace mina::dmg {
                     break;
                 }
 
-                case Opcode::ADD_sp_i8: {
+                // Add a signed 8-bit immediate value from the stack pointer.
+                case Opcode::ADD_SP_I8: {
                     i8  offset = static_cast<i8>(bus_read_imm8(cpu));
                     u16 sp     = read_reg16(cpu, Reg16::SP);
                     u32 res    = static_cast<u32>(sp + offset);
@@ -669,10 +706,11 @@ namespace mina::dmg {
                     break;
                 }
 
-                case Opcode::ADD_hl_bc:
-                case Opcode::ADD_hl_de:
-                case Opcode::ADD_hl_hl:
-                case Opcode::ADD_hl_sp: {
+                // Add the value of a 16-bit register to the HL register.
+                case Opcode::ADD_HL_BC:
+                case Opcode::ADD_HL_DE:
+                case Opcode::ADD_HL_HL:
+                case Opcode::ADD_HL_SP: {
                     Reg16 reg = static_cast<Reg16>(p);
                     u16   val = read_reg16(cpu, reg);
                     u16   hl  = read_reg16(cpu, Reg16::HL);
@@ -684,14 +722,16 @@ namespace mina::dmg {
                     break;
                 }
 
-                case Opcode::ADC_a_b:
-                case Opcode::ADC_a_c:
-                case Opcode::ADC_a_d:
-                case Opcode::ADC_a_e:
-                case Opcode::ADC_a_h:
-                case Opcode::ADC_a_l:
-                case Opcode::ADC_a_hl_ptr:
-                case Opcode::ADC_a_a:      {
+                // Add, considering the carry flag, the value contained in a given 8-bit register to
+                // the accumulator register.
+                case Opcode::ADC_A_B:
+                case Opcode::ADC_A_C:
+                case Opcode::ADC_A_D:
+                case Opcode::ADC_A_E:
+                case Opcode::ADC_A_H:
+                case Opcode::ADC_A_L:
+                case Opcode::ADC_A_HL_PTR:
+                case Opcode::ADC_A_A:      {
                     Reg8 reg       = static_cast<Reg8>(z);
                     u8   val       = read_reg8(cpu, reg);
                     u8   acc       = cpu->regfile.a;
@@ -709,7 +749,8 @@ namespace mina::dmg {
                     break;
                 }
 
-                case Opcode::ADC_a_u8: {
+                // Add an unsigned immediate 8-bit value to the accumulator register.
+                case Opcode::ADC_A_U8: {
                     u8  val        = bus_read_imm8(cpu);
                     u8  acc        = cpu->regfile.a;
                     u8  carry      = read_flag(cpu, Flag::C);
@@ -726,14 +767,16 @@ namespace mina::dmg {
                     break;
                 }
 
-                case Opcode::SUB_a_b:
-                case Opcode::SUB_a_c:
-                case Opcode::SUB_a_d:
-                case Opcode::SUB_a_e:
-                case Opcode::SUB_a_h:
-                case Opcode::SUB_a_l:
-                case Opcode::SUB_a_hl_ptr:
-                case Opcode::SUB_a_a:      {
+                // Subtract the value contained in a given 8-bit register from the accumulator
+                // register.
+                case Opcode::SUB_A_B:
+                case Opcode::SUB_A_C:
+                case Opcode::SUB_A_D:
+                case Opcode::SUB_A_E:
+                case Opcode::SUB_A_H:
+                case Opcode::SUB_A_L:
+                case Opcode::SUB_A_HL_PTR:
+                case Opcode::SUB_A_A:      {
                     Reg8 reg = static_cast<Reg8>(z);
                     u8   val = read_reg8(cpu, reg);
                     u8   acc = cpu->regfile.a;
@@ -746,7 +789,8 @@ namespace mina::dmg {
                     break;
                 }
 
-                case Opcode::SUB_a_u8: {
+                // Subtract from the accumulator register the immediate 8-bit value.
+                case Opcode::SUB_A_U8: {
                     u8 val = bus_read_imm8(cpu);
                     u8 acc = cpu->regfile.a;
                     cpu->regfile.a -= val;
@@ -758,14 +802,16 @@ namespace mina::dmg {
                     break;
                 }
 
-                case Opcode::SBC_a_b:
-                case Opcode::SBC_a_c:
-                case Opcode::SBC_a_d:
-                case Opcode::SBC_a_e:
-                case Opcode::SBC_a_h:
-                case Opcode::SBC_a_l:
-                case Opcode::SBC_a_hl_ptr:
-                case Opcode::SBC_a_a:      {
+                // Subtract, considering the carry flag, the value contained in a given 8-bit
+                // register from the accumulator register.
+                case Opcode::SBC_A_B:
+                case Opcode::SBC_A_C:
+                case Opcode::SBC_A_D:
+                case Opcode::SBC_A_E:
+                case Opcode::SBC_A_H:
+                case Opcode::SBC_A_L:
+                case Opcode::SBC_A_HL_PTR:
+                case Opcode::SBC_A_A:      {
                     Reg8 reg   = static_cast<Reg8>(z);
                     u8   val   = read_reg8(cpu, reg);
                     u8   acc   = cpu->regfile.a;
@@ -779,7 +825,7 @@ namespace mina::dmg {
                     break;
                 }
 
-                case Opcode::SBC_a_u8: {
+                case Opcode::SBC_A_U8: {
                     u8 val   = bus_read_imm8(cpu);
                     u8 acc   = cpu->regfile.a;
                     u8 carry = read_flag(cpu, Flag::C);
@@ -792,14 +838,14 @@ namespace mina::dmg {
                     break;
                 }
 
-                case Opcode::AND_a_b:
-                case Opcode::AND_a_c:
-                case Opcode::AND_a_d:
-                case Opcode::AND_a_e:
-                case Opcode::AND_a_h:
-                case Opcode::AND_a_l:
-                case Opcode::AND_a_hl_ptr:
-                case Opcode::AND_a_a:      {
+                case Opcode::AND_A_B:
+                case Opcode::AND_A_C:
+                case Opcode::AND_A_D:
+                case Opcode::AND_A_E:
+                case Opcode::AND_A_H:
+                case Opcode::AND_A_L:
+                case Opcode::AND_A_HL_PTR:
+                case Opcode::AND_A_A:      {
                     Reg8 reg = static_cast<Reg8>(z);
                     u8   val = read_reg8(cpu, reg);
                     cpu->regfile.a &= val;
@@ -810,7 +856,7 @@ namespace mina::dmg {
                     break;
                 }
 
-                case Opcode::AND_a_u8: {
+                case Opcode::AND_A_U8: {
                     cpu->regfile.a &= bus_read_imm8(cpu);
 
                     clear_all_flags(cpu);
@@ -819,14 +865,14 @@ namespace mina::dmg {
                     break;
                 }
 
-                case Opcode::XOR_a_b:
-                case Opcode::XOR_a_c:
-                case Opcode::XOR_a_d:
-                case Opcode::XOR_a_e:
-                case Opcode::XOR_a_h:
-                case Opcode::XOR_a_l:
-                case Opcode::XOR_a_hl_ptr:
-                case Opcode::XOR_a_a:      {
+                case Opcode::XOR_A_B:
+                case Opcode::XOR_A_C:
+                case Opcode::XOR_A_D:
+                case Opcode::XOR_A_E:
+                case Opcode::XOR_A_H:
+                case Opcode::XOR_A_L:
+                case Opcode::XOR_A_HL_PTR:
+                case Opcode::XOR_A_A:      {
                     Reg8 reg = static_cast<Reg8>(z);
                     u8   val = read_reg8(cpu, reg);
                     cpu->regfile.a ^= val;
@@ -836,7 +882,7 @@ namespace mina::dmg {
                     break;
                 }
 
-                case Opcode::XOR_a_u8: {
+                case Opcode::XOR_A_U8: {
                     cpu->regfile.a ^= bus_read_imm8(cpu);
 
                     clear_all_flags(cpu);
@@ -844,14 +890,14 @@ namespace mina::dmg {
                     break;
                 }
 
-                case Opcode::OR_a_b:
-                case Opcode::OR_a_c:
-                case Opcode::OR_a_d:
-                case Opcode::OR_a_e:
-                case Opcode::OR_a_h:
-                case Opcode::OR_a_l:
-                case Opcode::OR_a_hl_ptr:
-                case Opcode::OR_a_a:      {
+                case Opcode::OR_A_B:
+                case Opcode::OR_A_C:
+                case Opcode::OR_A_D:
+                case Opcode::OR_A_E:
+                case Opcode::OR_A_H:
+                case Opcode::OR_A_L:
+                case Opcode::OR_A_HL_PTR:
+                case Opcode::OR_A_A:      {
                     Reg8 reg = static_cast<Reg8>(z);
                     u8   val = read_reg8(cpu, reg);
                     cpu->regfile.a |= val;
@@ -861,7 +907,7 @@ namespace mina::dmg {
                     break;
                 }
 
-                case Opcode::OR_a_u8: {
+                case Opcode::OR_A_U8: {
                     u8 val = bus_read_imm8(cpu);
                     cpu->regfile.a |= val;
 
@@ -870,14 +916,14 @@ namespace mina::dmg {
                     break;
                 }
 
-                case Opcode::CP_a_b:
-                case Opcode::CP_a_c:
-                case Opcode::CP_a_d:
-                case Opcode::CP_a_e:
-                case Opcode::CP_a_h:
-                case Opcode::CP_a_l:
-                case Opcode::CP_a_hl_ptr:
-                case Opcode::CP_a_a:      {
+                case Opcode::CP_A_B:
+                case Opcode::CP_A_C:
+                case Opcode::CP_A_D:
+                case Opcode::CP_A_E:
+                case Opcode::CP_A_H:
+                case Opcode::CP_A_L:
+                case Opcode::CP_A_HL_PTR:
+                case Opcode::CP_A_A:      {
                     Reg8 reg = static_cast<Reg8>(z);
                     u8   val = read_reg8(cpu, reg);
 
@@ -888,7 +934,7 @@ namespace mina::dmg {
                     break;
                 }
 
-                case Opcode::CP_a_u8: {
+                case Opcode::CP_A_U8: {
                     u8 val = bus_read_imm8(cpu);
 
                     set_flag(cpu, Flag::N);
@@ -953,94 +999,125 @@ namespace mina::dmg {
                 case Opcode::CCF: {
                     break;
                 }
-                case Opcode::RET_nz: {
+
+                case Opcode::RET_NZ: {
+                    psh_todo();
                     break;
                 }
-                case Opcode::POP_bc: {
+                case Opcode::POP_BC: {
+                    psh_todo();
                     break;
                 }
-                case Opcode::CALL_nz_u16: {
+                case Opcode::CALL_NZ_U16: {
+                    psh_todo();
                     break;
                 }
-                case Opcode::PUSH_bc: {
+                case Opcode::PUSH_BC: {
+                    psh_todo();
                     break;
                 }
                 case Opcode::RST_0x00: {
+                    psh_todo();
                     break;
                 }
-                case Opcode::RET_z: {
+                case Opcode::RET_Z: {
+                    psh_todo();
                     break;
                 }
                 case Opcode::RET: {
+                    psh_todo();
                     break;
                 }
-                case Opcode::CALL_z_u16: {
+                case Opcode::CALL_Z_U16: {
+                    psh_todo();
                     break;
                 }
-                case Opcode::CALL_u16: {
+                case Opcode::CALL_U16: {
+                    psh_todo();
                     break;
                 }
                 case Opcode::RST_0x08: {
+                    psh_todo();
                     break;
                 }
-                case Opcode::RET_nc: {
+                case Opcode::RET_NC: {
+                    psh_todo();
                     break;
                 }
-                case Opcode::POP_de: {
+                case Opcode::POP_DE: {
+                    psh_todo();
                     break;
                 }
-                case Opcode::CALL_nc_u16: {
+                case Opcode::CALL_NC_U16: {
+                    psh_todo();
                     break;
                 }
-                case Opcode::PUSH_de: {
+                case Opcode::PUSH_DE: {
+                    psh_todo();
                     break;
                 }
                 case Opcode::RST_0x10: {
+                    psh_todo();
                     break;
                 }
-                case Opcode::RET_c: {
+                case Opcode::RET_C: {
+                    psh_todo();
                     break;
                 }
                 case Opcode::RETI: {
+                    psh_todo();
                     break;
                 }
-                case Opcode::CALL_c_u16: {
+                case Opcode::CALL_C_U16: {
+                    psh_todo();
                     break;
                 }
                 case Opcode::RST_0x18: {
+                    psh_todo();
                     break;
                 }
-                case Opcode::POP_hl: {
+                case Opcode::POP_HL: {
+                    psh_todo();
                     break;
                 }
-                case Opcode::PUSH_hl: {
+                case Opcode::PUSH_HL: {
+                    psh_todo();
                     break;
                 }
                 case Opcode::RST_0x20: {
+                    psh_todo();
                     break;
                 }
                 case Opcode::RST_0x28: {
+                    psh_todo();
                     break;
                 }
-                case Opcode::POP_af: {
+                case Opcode::POP_AF: {
+                    psh_todo();
                     break;
                 }
                 case Opcode::DI: {
+                    psh_todo();
                     break;
                 }
-                case Opcode::PUSH_af: {
+                case Opcode::PUSH_AF: {
+                    psh_todo();
                     break;
                 }
                 case Opcode::RST_0x30: {
+                    psh_todo();
                     break;
                 }
                 case Opcode::EI: {
+                    psh_todo();
                     break;
                 }
                 case Opcode::RST_0x38: {
+                    psh_todo();
                     break;
                 }
 
+                // Decode and execute the 0xCB-prefixed opcode.
                 case Opcode::PREFIX_0xCB: {
                     cb_dexec(cpu);
                     break;
