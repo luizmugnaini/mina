@@ -17,7 +17,7 @@
 ///
 ///
 /// Description: Metadata about the Mina emulator.
-/// Author: Luiz G. Mugnaini A. <luizmuganini@gmail.com>
+/// Author: Luiz G. Mugnaini A. <luizmugnaini@gmail.com>
 
 #pragma once
 

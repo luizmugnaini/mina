@@ -17,7 +17,7 @@
 ///
 ///
 /// Description: Game Boy's "DMG" CPU.
-/// Author: Luiz G. Mugnaini A. <luizmuganini@gmail.com>
+/// Author: Luiz G. Mugnaini A. <luizmugnaini@gmail.com>
 
 #pragma once
 
@@ -27,7 +27,7 @@
 #include <psh/option.h>
 #include <psh/types.h>
 
-namespace mina::dmg {
+namespace mina {
     /// CPU register file.
     ///
     /// Note: In order to avoid dealing with architecture endianness, we are going to separate each
@@ -59,11 +59,11 @@ namespace mina::dmg {
     /// The DMG is an SoC containing a Sharp SM83 CPU, which is based on the Zilog Z80 and
     /// Intel 8080.
     struct CPU {
-        RegisterFile regfile{};
-        MemoryMap    mmap{};
+        RegisterFile regfile  = {};
+        MemoryMap    mmap     = {};
         u16          bus_addr = 0x0000;
         u16          clock    = 0x0000;
-
-        void run_cycle() noexcept;
     };
-}  // namespace mina::dmg
+
+    void run_cpu_cycle(CPU& cpu) noexcept;
+}  // namespace mina

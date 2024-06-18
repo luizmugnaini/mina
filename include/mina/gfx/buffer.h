@@ -17,15 +17,20 @@
 ///
 ///
 /// Description: GPU buffer management.
-/// Author: Luiz G. Mugnaini A. <luizmuganini@gmail.com>
+/// Author: Luiz G. Mugnaini A. <luizmugnaini@gmail.com>
 
 #pragma once
 
-#include <mina/gfx/context.h>
+#include <mina/gfx/types.h>
 #include <vulkan/vulkan_core.h>
 
-namespace mina::gfx {
-    void make_gpu_buffers(MakeGPUBuffersInfo const& buf_info, GraphicsContext& ctx) noexcept;
+namespace mina {
+    void create_buffers(VmaAllocator alloc, BufferManager& bufs, QueueFamilies& queues) noexcept;
 
-    void transfer_host_data(GraphicsContext& ctx) noexcept;
-}  // namespace mina::gfx
+    void destroy_buffers(VmaAllocator alloc, BufferManager& bufs) noexcept;
+
+    void stage_host_data(
+        VmaAllocator       alloc,
+        Buffer const&      staging_buf,
+        StagingInfo const& staging_info) noexcept;
+}  // namespace mina

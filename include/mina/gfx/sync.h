@@ -17,14 +17,18 @@
 ///
 ///
 /// Description: Vulkan graphics synchronization layer.
-/// Author: Luiz G. Mugnaini A. <luizmuganini@gmail.com>
+/// Author: Luiz G. Mugnaini A. <luizmugnaini@gmail.com>
 
 #pragma once
 
-#include <mina/gfx/context.h>
+#include <mina/gfx/types.h>
 
-namespace mina::gfx {
-    void create_synchronizers(GraphicsContext& ctx) noexcept;
+namespace mina {
+    void create_synchronizers(
+        VkDevice             dev,
+        SynchronizerManager& sync,
+        psh::Arena*          persistent_arena,
+        u32                  max_frames_in_flight) noexcept;
 
-    void destroy_synchronizers(GraphicsContext& ctx) noexcept;
+    void destroy_synchronizers(VkDevice dev, SynchronizerManager& sync) noexcept;
 }  // namespace mina::gfx

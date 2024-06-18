@@ -1,4 +1,3 @@
-/// Author: Luiz Gustavo Mugnaini Anselmo <luizmugnaini@gmail.com>
 ///                          Mina, Game Boy emulator
 ///    Copyright (C) 2024 Luiz Gustavo Mugnaini Anselmo
 ///
@@ -18,56 +17,53 @@
 ///
 ///
 /// Description: Vulkan graphics application context.
-/// Author: Luiz G. Mugnaini A. <luizmuganini@gmail.com>
+/// Author: Luiz G. Mugnaini A. <luizmugnaini@gmail.com>
 
 #pragma once
 
 #include <mina/gfx/types.h>
-#include <mina/gfx/window.h>
+#include <mina/window.h>
 #include <psh/arena.h>
 #include <psh/assert.h>
 #include <psh/dyn_array.h>
 #include <psh/types.h>
 #include <vulkan/vulkan_core.h>
 
-namespace mina::gfx {
-    struct GraphicsContextGPUBufferConfig {
-        usize staging_buffer_size;
-        usize data_buffer_size;
-    };
-
-    struct GraphicsContextConfig {
-        psh::Arena*                    persistent_arena;
-        psh::Arena*                    work_arena;
-        WindowConfig                   win_config;
-        GraphicsContextGPUBufferConfig buf_config;
-    };
-
+namespace mina {
     struct GraphicsContext {
-        psh::Arena*       persistent_arena = nullptr;
-        psh::Arena*       work_arena       = nullptr;
-        psh::DynArray<u8> data{};
-        Window            window{};
-        VkInstance        instance = nullptr;
-        VkPhysicalDevice  pdev     = nullptr;
-        VkSurfaceKHR      surf     = nullptr;
-        VkDevice          dev      = nullptr;
-        VmaAllocator      gpu_allocator{};
-        GPUBuffers        buffers{};
-        SwapChain         swap_chain{};
-        QueueFamilies     queues{};
-        Pipelines         pipelines{};
-        Commands          cmd{};
-        Synchronizers     sync{};
+        psh::Arena* persistent_arena = nullptr;
+        psh::Arena* work_arena       = nullptr;
 
-#if defined(MINA_VULKAN_DEBUG)
+        VkInstance       instance = nullptr;
+        VkPhysicalDevice pdev     = nullptr;
+        VkSurfaceKHR     surf     = nullptr;
+        VkDevice         dev      = nullptr;
+
+#if defined(MINA_DEBUG) || defined(MINA_VULKAN_DEBUG)
         VkDebugUtilsMessengerEXT dbg_msg = nullptr;
 #endif
+
+        VmaAllocator         alloc           = {};
+        BufferManager        buffers         = {};
+        SwapChain            swap_chain      = {};
+        QueueFamilies        queues          = {};
+        DescriptorSetManager descriptor_sets = {};
+        PipelineManager      pipelines       = {};
+        CommandManager       commands        = {};
+        SynchronizerManager  sync            = {};
     };
 
     /// Initialize the graphics context instance according to the given configurations.
-    void init_graphics_context(GraphicsContext& ctx, GraphicsContextConfig const& config) noexcept;
+    void init_graphics_system(
+        GraphicsContext& ctx,
+        WindowHandle*    win_handle,
+        psh::Arena*      persistent_arena,
+        psh::Arena*      work_arena) noexcept;
 
     /// Destroy all resources attached and managed by the graphics context.
-    void destroy_graphics_context(GraphicsContext& ctx) noexcept;
-}  // namespace mina::gfx
+    void destroy_graphics_system(GraphicsContext& ctx) noexcept;
+
+    void recreate_swap_chain_context(GraphicsContext& ctx, Window& win) noexcept;
+
+    FrameResources current_frame_resources(GraphicsContext const& ctx) noexcept;
+}  // namespace mina

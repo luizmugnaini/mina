@@ -209,11 +209,16 @@ def command_build(build_flags: list[str] = []):
     sp_run(["cmake", "--build", str(BUILD_DIR)])
 
 
-def command_run_mina():
+def command_run_mina(rom: str | None):
     command_build()
 
     header("Running game")
-    sp_run([str(BIN_DIR / MINA_BIN_NAME)])
+    cmd = (
+        [str(BIN_DIR / MINA_BIN_NAME), rom]
+        if rom is not None
+        else [str(BIN_DIR / MINA_BIN_NAME)]
+    )
+    sp_run(cmd)
 
 
 def command_test(pattern: str):
@@ -277,6 +282,7 @@ parser.add_argument(
 parser.add_argument(
     "--spell", action="store_true", help="Spell-check all source files with codespell"
 )
+parser.add_argument("--rom", help="The ROM file that should be used")
 
 args = parser.parse_args()
 
@@ -304,6 +310,6 @@ if args.build is not None:
         case "release":
             command_build(build_flags=RELEASE_FLAGS)
 if args.run:
-    command_run_mina()
+    command_run_mina(rom=args.rom)
 if args.test is not None:
     command_test(args.test)

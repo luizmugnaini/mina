@@ -17,13 +17,13 @@
 ///
 ///
 /// Description: Enumerations of the Game Boy DMG opcodes.
-/// Author: Luiz G. Mugnaini A. <luizmuganini@gmail.com>
+/// Author: Luiz G. Mugnaini A. <luizmugnaini@gmail.com>
 
 #pragma once
 
 #include <psh/types.h>
 
-namespace mina::dmg {
+namespace mina {
     enum struct Opcode : u8 {
         NOP                = 0x00,
         LD_BC_U16          = 0x01,
@@ -295,4 +295,4 @@ namespace mina::dmg {
         SWAP = 0b110,
         SRL  = 0b111,
     };
-}  // namespace mina::dmg
+}  // namespace mina

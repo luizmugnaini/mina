@@ -17,7 +17,7 @@
 ///
 ///
 /// Description: Inclusion header for the VulkanMemoryAllocator library.
-/// Author: Luiz G. Mugnaini A. <luizmuganini@gmail.com>
+/// Author: Luiz G. Mugnaini A. <luizmugnaini@gmail.com>
 ///
 /// Always use this header instead of `#include <vk_mem_alloc.h>` directly.
 

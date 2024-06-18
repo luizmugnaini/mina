@@ -17,7 +17,7 @@
 ///
 ///
 /// Description: Implementation of the Vulkan graphics swap chain management layer.
-/// Author: Luiz G. Mugnaini A. <luizmuganini@gmail.com>
+/// Author: Luiz G. Mugnaini A. <luizmugnaini@gmail.com>
 
 #include <mina/gfx/swap_chain.h>
 
@@ -25,105 +25,55 @@
 #include <psh/buffer.h>
 #include <psh/intrinsics.h>
 #include <psh/mem_utils.h>
-#include <vulkan/vulkan_core.h>
 #include <cstring>
 
-namespace mina::gfx {
-    namespace {
-        constexpr u64 NEXT_IMAGE_TIMEOUT = UINT64_MAX;
+namespace mina {
+    // Does the same as `create_image_views` but without initializing the image and image view
+    // arrays, simply reusing and overriding their memory.
+    void recreate_image_views(VkDevice dev, SwapChain& swc) noexcept {
+        u32 img_count = static_cast<u32>(swc.images.size);
 
-        // Does the same as `create_image_views` but without initializing the image and image view
-        // arrays, simply reusing and overriding their memory.
-        void recreate_image_views(GraphicsContext& ctx) noexcept {
-            u32 img_count = static_cast<u32>(ctx.swap_chain.img.size);
+        vkGetSwapchainImagesKHR(dev, swc.handle, &img_count, swc.images.buf);
 
-            vkGetSwapchainImagesKHR(
-                ctx.dev,
-                ctx.swap_chain.handle,
-                &img_count,
-                ctx.swap_chain.img.buf);
+        VkImageViewCreateInfo img_info{
+            .sType            = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO,
+            .viewType         = VK_IMAGE_VIEW_TYPE_2D,
+            .format           = swc.surface_format.format,
+            .components       = IMAGE_COMPONENT_MAPPING,
+            .subresourceRange = IMAGE_SUBRESOURCE_RANGE,
+        };
 
-            VkImageViewCreateInfo img_info{
-                .sType    = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO,
-                .viewType = VK_IMAGE_VIEW_TYPE_2D,
-                .format   = ctx.swap_chain.surf_fmt.format,
-                .components =
-                    VkComponentMapping{
-                        .r = VK_COMPONENT_SWIZZLE_IDENTITY,
-                        .g = VK_COMPONENT_SWIZZLE_IDENTITY,
-                        .b = VK_COMPONENT_SWIZZLE_IDENTITY,
-                        .a = VK_COMPONENT_SWIZZLE_IDENTITY,
-                    },
-                .subresourceRange =
-                    VkImageSubresourceRange{
-                        .aspectMask     = VK_IMAGE_ASPECT_COLOR_BIT,
-                        .baseMipLevel   = 0,
-                        .levelCount     = 1,
-                        .baseArrayLayer = 0,
-                        .layerCount     = 1,
-                    },
-            };
-
-            for (u32 idx = 0; idx < img_count; ++idx) {
-                img_info.image = ctx.swap_chain.img[idx];
-                mina_vk_assert(
-                    vkCreateImageView(ctx.dev, &img_info, nullptr, &ctx.swap_chain.img_view[idx]));
-            }
+        for (u32 idx = 0; idx < img_count; ++idx) {
+            img_info.image = swc.images[idx];
+            mina_vk_assert(vkCreateImageView(dev, &img_info, nullptr, &swc.image_views[idx]));
         }
+    }
 
-        // NOTE: Does the same as `create_frame_buffers` but without initializing the frame buffer
-        // array,
-        //       simply reusing and overriding its memory.
-        void recreate_frame_buffers(GraphicsContext& ctx) noexcept {
-            usize const img_count = ctx.swap_chain.img_view.size;
-            ctx.swap_chain.frame_buf.init(ctx.persistent_arena, img_count);
+    // NOTE: Does the same as `create_frame_buffers` but without initializing the frame buffer
+    // array,
+    //       simply reusing and overriding its memory.
+    void recreate_frame_buffers(VkDevice dev, SwapChain& swc, RenderPass const& gfx_pass) noexcept {
+        VkFramebufferCreateInfo fb_info{
+            .sType           = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO,
+            .renderPass      = gfx_pass.handle,
+            .attachmentCount = 1,
+            .pAttachments    = nullptr,  // NOTE: Filled for each frame buffer in the loop below.
+            .width           = swc.extent.width,
+            .height          = swc.extent.height,
+            .layers          = 1,
+        };
 
-            VkFramebufferCreateInfo fb_info{
-                .sType           = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO,
-                .renderPass      = ctx.pipelines.graphics.pass.handle,
-                .attachmentCount = 1,
-                .width           = ctx.swap_chain.extent.width,
-                .height          = ctx.swap_chain.extent.height,
-                .layers          = 1,
-            };
-
-            for (u32 idx = 0; idx < img_count; ++idx) {
-                fb_info.pAttachments = &ctx.swap_chain.img_view[idx];
-                mina_vk_assert(vkCreateFramebuffer(
-                    ctx.dev,
-                    &fb_info,
-                    nullptr,
-                    &ctx.swap_chain.frame_buf[idx]));
-            }
+        // Create new frame buffers by overwriting the old ones.
+        for (u32 idx = 0; idx < swc.image_views.size; ++idx) {
+            fb_info.pAttachments = &swc.image_views[idx];
+            mina_vk_assert(vkCreateFramebuffer(dev, &fb_info, nullptr, &swc.frame_bufs[idx]));
         }
-
-        void recreate_swap_chain(GraphicsContext& ctx) noexcept {
-            ctx.window.wait_if_minimized();
-
-            // Complete all operations before proceeding
-            vkDeviceWaitIdle(ctx.dev);
-
-            destroy_swap_chain(ctx);
-            {
-                auto          sarena = ctx.work_arena->make_scratch();
-                SwapChainInfo swc_info;
-                query_swap_chain_info(sarena.arena, ctx.pdev, ctx.surf, swc_info);
-
-                // NOTE: since the swap chain creation doesn't require persistent arena memory, we
-                // can
-                //       simply create it again (no need for a "recreate" function).
-                create_swap_chain(ctx, swc_info);
-            }
-            recreate_image_views(ctx);
-            recreate_frame_buffers(ctx);
-        }
-
-    }  // namespace
+    }
 
     void query_swap_chain_info(
-        psh::Arena*      arena,
         VkPhysicalDevice pdev,
         VkSurfaceKHR     surf,
+        psh::Arena*      arena,
         SwapChainInfo&   swc_info) noexcept {
         // Clear all previous queries.
         std::memset(reinterpret_cast<void*>(&swc_info), 0, sizeof(SwapChainInfo));
@@ -133,12 +83,12 @@ namespace mina::gfx {
             u32 fmt_count;
             vkGetPhysicalDeviceSurfaceFormatsKHR(pdev, surf, &fmt_count, nullptr);
 
-            swc_info.surf_fmt.init(arena, fmt_count);
+            swc_info.surface_formats.init(arena, fmt_count);
             mina_vk_assert(vkGetPhysicalDeviceSurfaceFormatsKHR(
                 pdev,
                 surf,
                 &fmt_count,
-                swc_info.surf_fmt.buf));
+                swc_info.surface_formats.buf));
         }
 
         // Presentation modes.
@@ -146,84 +96,84 @@ namespace mina::gfx {
             u32 pm_count;
             vkGetPhysicalDeviceSurfacePresentModesKHR(pdev, surf, &pm_count, nullptr);
 
-            swc_info.pres_modes.init(arena, pm_count);
+            // TODO: This is bad, we are possibly leaking memory.
+            swc_info.presentation_modes.init(arena, pm_count);
             mina_vk_assert(vkGetPhysicalDeviceSurfacePresentModesKHR(
                 pdev,
                 surf,
                 &pm_count,
-                swc_info.pres_modes.buf));
+                swc_info.presentation_modes.buf));
         }
 
-        vkGetPhysicalDeviceSurfaceCapabilitiesKHR(pdev, surf, &swc_info.surf_capa);
+        vkGetPhysicalDeviceSurfaceCapabilitiesKHR(pdev, surf, &swc_info.surface_capabilities);
     }
 
-    void create_swap_chain(GraphicsContext& ctx, SwapChainInfo const& swc_info) noexcept {
+    void create_swap_chain(
+        VkDevice             dev,
+        VkSurfaceKHR         surf,
+        SwapChain&           swc,
+        QueueFamilies const& queues,
+        WindowHandle*        win_handle,
+        SwapChainInfo const& swc_info) noexcept {
         // Select optimal surface format.
         u32 optimal_surf_fmt_idx = 0;
-        for (u32 idx = 0; idx < swc_info.surf_fmt.size; ++idx) {
-            bool const good_fmt = (swc_info.surf_fmt[idx].format == VK_FORMAT_B8G8R8A8_SRGB);
+        for (u32 idx = 0; idx < swc_info.surface_formats.size; ++idx) {
+            bool const good_fmt = (swc_info.surface_formats[idx].format == VK_FORMAT_B8G8R8A8_SRGB);
             bool const good_col_space =
-                (swc_info.surf_fmt[idx].colorSpace == VK_COLOR_SPACE_SRGB_NONLINEAR_KHR);
+                (swc_info.surface_formats[idx].colorSpace == VK_COLOR_SPACE_SRGB_NONLINEAR_KHR);
 
             if (good_fmt && good_col_space) {
                 optimal_surf_fmt_idx = idx;
                 break;
             }
         }
-        ctx.swap_chain.surf_fmt = swc_info.surf_fmt[optimal_surf_fmt_idx];
+        swc.surface_format = swc_info.surface_formats[optimal_surf_fmt_idx];
 
         // Select optimal extent.
-        if (swc_info.surf_capa.currentExtent.width != std::numeric_limits<u32>::max()) {
-            ctx.swap_chain.extent.width  = swc_info.surf_capa.currentExtent.width;
-            ctx.swap_chain.extent.height = swc_info.surf_capa.currentExtent.height;
+        if (swc_info.surface_capabilities.currentExtent.width != std::numeric_limits<u32>::max()) {
+            swc.extent.width  = swc_info.surface_capabilities.currentExtent.width;
+            swc.extent.height = swc_info.surface_capabilities.currentExtent.height;
         } else {
             i32 fb_width, fb_height;
-            glfwGetFramebufferSize(ctx.window.handle, &fb_width, &fb_height);
+            glfwGetFramebufferSize(win_handle, &fb_width, &fb_height);
 
-            ctx.swap_chain.extent.width = psh_clamp(
+            swc.extent.width = psh_clamp(
                 static_cast<u32>(fb_width),
-                swc_info.surf_capa.minImageExtent.width,
-                swc_info.surf_capa.maxImageExtent.width);
-            ctx.swap_chain.extent.height = psh_clamp(
+                swc_info.surface_capabilities.minImageExtent.width,
+                swc_info.surface_capabilities.maxImageExtent.width);
+            swc.extent.height = psh_clamp(
                 static_cast<u32>(fb_height),
-                swc_info.surf_capa.minImageExtent.height,
-                swc_info.surf_capa.maxImageExtent.height);
+                swc_info.surface_capabilities.minImageExtent.height,
+                swc_info.surface_capabilities.maxImageExtent.height);
         }
 
-        // Select optimal present mode.
-        //
-        // NOTE: Although mailbox may be better for performance reasons, it may cause the screen
-        //       region that got reduced to be completely black, as if we just erased that part from
-        //       the frame buffer.
-        VkPresentModeKHR optimal_present_mode = VK_PRESENT_MODE_FIFO_KHR;
-        // if (psh::contains(VK_PRESENT_MODE_MAILBOX_KHR, swc_info.pres_modes.const_fat_ptr())) {
-        //     optimal_present_mode = VK_PRESENT_MODE_MAILBOX_KHR;
-        // }
+        // Compute the number of images handled by the swap chain. Whenever the maximum image count
+        // is non-zero, there exists a limit to be accounted.
+        u32 img_count = (swc_info.surface_capabilities.maxImageCount == 0)
+                            ? (swc_info.surface_capabilities.minImageCount + 1)
+                            : psh_min(
+                                  swc_info.surface_capabilities.minImageCount + 1,
+                                  swc_info.surface_capabilities.maxImageCount);
 
-        // Compute the number of images handled by the swap chain.
-        u32 const max_img_count = swc_info.surf_capa.maxImageCount;
-        u32       img_count     = swc_info.surf_capa.minImageCount + 1;
-        if (max_img_count != 0) {  // There is a restricted maximum.
-            img_count = psh_min(img_count, max_img_count);
-        }
-
-        ctx.swap_chain.max_frames_in_flight = img_count - 1;
+        swc.max_frames_in_flight = img_count - 1;
 
         VkSwapchainCreateInfoKHR create_info{
             .sType            = VK_STRUCTURE_TYPE_SWAPCHAIN_CREATE_INFO_KHR,
-            .surface          = ctx.surf,
+            .surface          = surf,
             .minImageCount    = img_count,
-            .imageFormat      = ctx.swap_chain.surf_fmt.format,
-            .imageColorSpace  = ctx.swap_chain.surf_fmt.colorSpace,
-            .imageExtent      = ctx.swap_chain.extent,
+            .imageFormat      = swc.surface_format.format,
+            .imageColorSpace  = swc.surface_format.colorSpace,
+            .imageExtent      = swc.extent,
             .imageArrayLayers = 1,
             .imageUsage       = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT,
             // No transform to the image.
             .preTransform     = VK_SURFACE_TRANSFORM_IDENTITY_BIT_KHR,
             // No alpha-compose with other windows.
             .compositeAlpha   = VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR,
-            // TODO: change this to mailbox in the future.
-            .presentMode      = optimal_present_mode,
+            // NOTE: Although mailbox may be better for performance reasons, it may cause the screen
+            //       region that got reduced to be completely black, as if we just erased that part
+            //       from the frame buffer.
+            .presentMode      = VK_PRESENT_MODE_FIFO_KHR,
             // Ignore the color of pixels outside the view.
             .clipped          = VK_TRUE,
             // NOTE: We should start dealing with old swap chains as soon as we want
@@ -231,156 +181,144 @@ namespace mina::gfx {
             .oldSwapchain     = nullptr,
         };
 
-        auto               sarena           = ctx.work_arena->make_scratch();
-        psh::DynArray<u32> queue_uidx       = ctx.queues.unique_indices(sarena.arena);
-        usize const        unique_idx_count = queue_uidx.size;
-        if (unique_idx_count != 1) {
+        // Resolve the sharing mode for the images.
+        if (queues.graphics_queue_index != queues.present_queue_index) {
+            psh::FatPtr<u32 const> indices    = queues.indices();
             create_info.imageSharingMode      = VK_SHARING_MODE_CONCURRENT;
-            create_info.queueFamilyIndexCount = static_cast<u32>(unique_idx_count);
-            create_info.pQueueFamilyIndices   = queue_uidx.buf;
+            create_info.queueFamilyIndexCount = static_cast<u32>(indices.size);
+            create_info.pQueueFamilyIndices   = indices.buf;
         } else {
             // In the exclusive case we have to deal with ownership transfers of the images
-            // between queue families.
+            // between queue families via image memory barriers.
             create_info.imageSharingMode = VK_SHARING_MODE_EXCLUSIVE;
         }
 
-        mina_vk_assert(
-            vkCreateSwapchainKHR(ctx.dev, &create_info, nullptr, &ctx.swap_chain.handle));
+        mina_vk_assert(vkCreateSwapchainKHR(dev, &create_info, nullptr, &swc.handle));
     }
 
-    void create_image_views(GraphicsContext& ctx) noexcept {
+    void destroy_swap_chain(VkDevice dev, SwapChain& swc) noexcept {
+        usize img_count = swc.image_views.size;
+        for (usize idx = 0; idx < img_count; ++idx) {
+            vkDestroyImageView(dev, swc.image_views[idx], nullptr);
+        }
+        for (usize idx = 0; idx < img_count; ++idx) {
+            vkDestroyFramebuffer(dev, swc.frame_bufs[idx], nullptr);
+        }
+        vkDestroySwapchainKHR(dev, swc.handle, nullptr);
+    }
+
+    void create_image_views(VkDevice dev, SwapChain& swc, psh::Arena* persistent_arena) noexcept {
         u32 img_count;
-        vkGetSwapchainImagesKHR(ctx.dev, ctx.swap_chain.handle, &img_count, nullptr);
+        vkGetSwapchainImagesKHR(dev, swc.handle, &img_count, nullptr);
 
-        ctx.swap_chain.img.init(ctx.persistent_arena, img_count);
-        ctx.swap_chain.img_view.init(ctx.persistent_arena, img_count);
+        swc.images.init(persistent_arena, img_count);
+        swc.image_views.init(persistent_arena, img_count);
 
-        vkGetSwapchainImagesKHR(ctx.dev, ctx.swap_chain.handle, &img_count, ctx.swap_chain.img.buf);
+        vkGetSwapchainImagesKHR(dev, swc.handle, &img_count, swc.images.buf);
 
         VkImageViewCreateInfo img_info{
-            .sType    = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO,
-            .viewType = VK_IMAGE_VIEW_TYPE_2D,
-            .format   = ctx.swap_chain.surf_fmt.format,
-            .components =
-                VkComponentMapping{
-                    .r = VK_COMPONENT_SWIZZLE_IDENTITY,
-                    .g = VK_COMPONENT_SWIZZLE_IDENTITY,
-                    .b = VK_COMPONENT_SWIZZLE_IDENTITY,
-                    .a = VK_COMPONENT_SWIZZLE_IDENTITY,
-                },
-            .subresourceRange =
-                VkImageSubresourceRange{
-                    .aspectMask     = VK_IMAGE_ASPECT_COLOR_BIT,
-                    .baseMipLevel   = 0,
-                    .levelCount     = 1,
-                    .baseArrayLayer = 0,
-                    .layerCount     = 1,
-                },
+            .sType            = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO,
+            .viewType         = VK_IMAGE_VIEW_TYPE_2D,
+            .format           = swc.surface_format.format,
+            .components       = IMAGE_COMPONENT_MAPPING,
+            .subresourceRange = IMAGE_SUBRESOURCE_RANGE,
         };
 
         for (u32 idx = 0; idx < img_count; ++idx) {
-            img_info.image = ctx.swap_chain.img[idx];
-            mina_vk_assert(
-                vkCreateImageView(ctx.dev, &img_info, nullptr, &ctx.swap_chain.img_view[idx]));
+            img_info.image = swc.images[idx];
+            mina_vk_assert(vkCreateImageView(dev, &img_info, nullptr, &swc.image_views[idx]));
         }
     }
 
-    void create_frame_buffers(GraphicsContext& ctx) noexcept {
-        usize const img_count = ctx.swap_chain.img_view.size;
-        ctx.swap_chain.frame_buf.init(ctx.persistent_arena, img_count);
+    void create_frame_buffers(
+        VkDevice          dev,
+        SwapChain&        swc,
+        psh::Arena*       persistent_arena,
+        RenderPass const& gfx_pass) noexcept {
+        usize img_count = swc.image_views.size;
+        swc.frame_bufs.init(persistent_arena, img_count);
 
         VkFramebufferCreateInfo fb_info{
             .sType           = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO,
-            .renderPass      = ctx.pipelines.graphics.pass.handle,
+            .renderPass      = gfx_pass.handle,
             .attachmentCount = 1,
-            .width           = ctx.swap_chain.extent.width,
-            .height          = ctx.swap_chain.extent.height,
+            .width           = swc.extent.width,
+            .height          = swc.extent.height,
             .layers          = 1,
         };
 
         for (u32 idx = 0; idx < img_count; ++idx) {
-            fb_info.pAttachments = &ctx.swap_chain.img_view[idx];
-            mina_vk_assert(
-                vkCreateFramebuffer(ctx.dev, &fb_info, nullptr, &ctx.swap_chain.frame_buf[idx]));
+            fb_info.pAttachments = &swc.image_views[idx];
+            mina_vk_assert(vkCreateFramebuffer(dev, &fb_info, nullptr, &swc.frame_bufs[idx]));
         }
     }
 
-    bool prepare_frame_for_rendering(GraphicsContext& ctx) noexcept {
-        u32 const current_frame = ctx.swap_chain.current_frame;
-
-        // TODO: We should possibly use vkGetFenceStatus and return false if the fence isn't
-        // signaled.
-        //       This allows us to continue working instead of stalling.
-        VkResult const fence_status =
-            vkGetFenceStatus(ctx.dev, ctx.sync.frame_in_flight[current_frame]);
+    FrameStatus
+    prepare_frame_for_rendering(VkDevice dev, SwapChain& swc, FrameResources& resources) noexcept {
+        VkResult fence_status = vkGetFenceStatus(dev, resources.frame_in_flight_fence);
         switch (fence_status) {
             case VK_SUCCESS:           break;
-            case VK_NOT_READY:         return false;
-            case VK_ERROR_DEVICE_LOST: psh_todo();
+            case VK_NOT_READY:         return FrameStatus::NOT_READY;
+            case VK_ERROR_DEVICE_LOST: psh_todo_msg("Handle device lost");  // TODO: error handling.
             default:                   psh_unreachable();
         }
 
-        VkResult const img_res = vkAcquireNextImageKHR(
-            ctx.dev,
-            ctx.swap_chain.handle,
+        constexpr u64 NEXT_IMAGE_TIMEOUT = UINT64_MAX;
+        VkResult      img_res            = vkAcquireNextImageKHR(
+            dev,
+            swc.handle,
             NEXT_IMAGE_TIMEOUT,
-            ctx.sync.swap_chain[current_frame],
+            resources.image_available_semaphore,
             nullptr,
-            &ctx.swap_chain.current_img_idx);
+            &swc.current_image_index);
 
-        bool success = true;
+        FrameStatus status = FrameStatus::OK;
         switch (img_res) {
-            case VK_SUCCESS:               break;
-            case VK_SUBOPTIMAL_KHR:                                   // Pass-through.
-            case VK_ERROR_OUT_OF_DATE_KHR: recreate_swap_chain(ctx);  // Pass-through.
-            case VK_TIMEOUT:                                          // Pass-through.
-            case VK_NOT_READY:             success = false; break;
+            case VK_SUCCESS: {
+                // Set the swap-chain related resources.
+                resources.image     = swc.images[swc.current_image_index];
+                resources.frame_buf = swc.frame_bufs[swc.current_image_index];
+
+                mina_vk_assert(vkResetFences(dev, 1, &resources.frame_in_flight_fence));
+                break;
+            }
+            case VK_SUBOPTIMAL_KHR:        // Pass-through.
+            case VK_ERROR_OUT_OF_DATE_KHR: status = FrameStatus::SWAP_CHAIN_OUT_OF_DATE; break;
+            case VK_TIMEOUT:               // Pass-through.
+            case VK_NOT_READY:             status = FrameStatus::NOT_READY; break;
             default:                       psh_unreachable();
         }
 
-        // Late reset to avoid deadlocks.
-        if (psh_likely(success)) {
-            mina_vk_assert(vkResetFences(ctx.dev, 1, &ctx.sync.frame_in_flight[current_frame]));
-        }
-
-        return success;
+        return status;
     }
 
-    bool present_frame(GraphicsContext& ctx) noexcept {
+    PresentStatus present_frame(
+        SwapChain&    swc,
+        Window const& win,
+        VkQueue       present_queue,
+        VkSemaphore   finished_gfx_pass) noexcept {
         VkPresentInfoKHR present_info{
             .sType              = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR,
             .waitSemaphoreCount = 1,
-            .pWaitSemaphores    = &ctx.sync.render_pass[ctx.swap_chain.current_frame],
+            .pWaitSemaphores    = &finished_gfx_pass,
             .swapchainCount     = 1,
-            .pSwapchains        = &ctx.swap_chain.handle,
-            .pImageIndices      = &ctx.swap_chain.current_img_idx,
+            .pSwapchains        = &swc.handle,
+            .pImageIndices      = &swc.current_image_index,
         };
-        VkResult res = vkQueuePresentKHR(ctx.queues.present, &present_info);
+        VkResult res = vkQueuePresentKHR(present_queue, &present_info);
 
-        bool success = true;
-        if (res == VK_ERROR_OUT_OF_DATE_KHR || res == VK_SUBOPTIMAL_KHR || ctx.window.resized) {
-            recreate_swap_chain(ctx);
+        PresentStatus present_status = {};
+        if (res == VK_ERROR_OUT_OF_DATE_KHR || res == VK_SUBOPTIMAL_KHR || win.resized) {
+            present_status = PresentStatus::SWAP_CHAIN_OUT_OF_DATE;
         } else if (res != VK_SUCCESS) {
             // TODO: proper error handling.
-            psh_error("Unable to present swap chain image");
-            success = false;
+            psh_todo_msg("Handle presentation fail.");
+            present_status = PresentStatus::FATAL;
         }
 
         // Switch to the next available frame.
-        ctx.swap_chain.current_frame =
-            (ctx.swap_chain.current_frame + 1u) % ctx.swap_chain.max_frames_in_flight;
+        swc.current_frame = (swc.current_frame + 1u) % swc.max_frames_in_flight;
 
-        return success;
+        return present_status;
     }
-
-    void destroy_swap_chain(GraphicsContext& ctx) noexcept {
-        usize const img_count = ctx.swap_chain.img_view.size;
-        for (usize idx = 0; idx < img_count; ++idx) {
-            vkDestroyImageView(ctx.dev, ctx.swap_chain.img_view[idx], nullptr);
-        }
-        for (usize idx = 0; idx < img_count; ++idx) {
-            vkDestroyFramebuffer(ctx.dev, ctx.swap_chain.frame_buf[idx], nullptr);
-        }
-        vkDestroySwapchainKHR(ctx.dev, ctx.swap_chain.handle, nullptr);
-    }
-}  // namespace mina::gfx
+}  // namespace mina

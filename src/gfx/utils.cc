@@ -17,16 +17,16 @@
 ///
 ///
 /// Description: Implementation of the Vulkan graphics utility functions.
-/// Author: Luiz G. Mugnaini A. <luizmuganini@gmail.com>
+/// Author: Luiz G. Mugnaini A. <luizmugnaini@gmail.com>
 
 #include <mina/gfx/utils.h>
 
 #include <psh/array.h>
-#include <psh/io.h>
+#include <psh/log.h>
 #include <psh/string.h>
 #include <vulkan/vulkan_core.h>
 
-namespace mina::gfx {
+namespace mina {
     bool has_validation_layers(
         psh::ScratchArena&&       sarena,
         psh::FatPtr<strptr const> layers) noexcept {
@@ -38,7 +38,7 @@ namespace mina::gfx {
 
         for (strptr l : layers) {
             bool found = false;
-            for (auto const& al : avail_layers) {
+            for (VkLayerProperties const& al : avail_layers) {
                 if (psh::str_equal(l, al.layerName)) {
                     found = true;
                     break;
@@ -64,7 +64,7 @@ namespace mina::gfx {
 
         for (strptr e : exts) {
             bool found = false;
-            for (auto const& ae : avail_ext) {
+            for (VkExtensionProperties const& ae : avail_ext) {
                 if (psh::str_equal(e, ae.extensionName)) {
                     found = true;
                     break;
@@ -79,7 +79,7 @@ namespace mina::gfx {
         return true;
     }
 
-    strptr debug_msg_type_str(VkDebugUtilsMessageTypeFlagsEXT type) noexcept {
+    inline strptr debug_msg_type_str(VkDebugUtilsMessageTypeFlagsEXT type) noexcept {
         strptr type_str;
         switch (type) {
             case VK_DEBUG_UTILS_MESSAGE_TYPE_GENERAL_BIT_EXT: {
@@ -168,4 +168,4 @@ namespace mina::gfx {
             dum_destroy_fn(instance, dum, alloc_cb);
         }
     }
-}  // namespace mina::gfx
+}  // namespace mina

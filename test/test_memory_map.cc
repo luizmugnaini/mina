@@ -17,12 +17,12 @@
 ///
 ///
 /// Description: Tests for the Game Boy's memory map.
-/// Author: Luiz G. Mugnaini A. <luizmuganini@gmail.com>
+/// Author: Luiz G. Mugnaini A. <luizmugnaini@gmail.com>
 
 #include <mina/memory_map.h>
 
 #include <psh/assert.h>
-#include <psh/io.h>
+#include <psh/log.h>
 #include <cstddef>
 
 using namespace mina;

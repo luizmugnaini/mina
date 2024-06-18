@@ -17,31 +17,55 @@
 ///
 ///
 /// Description: Vulkan graphics swap chain management layer.
-/// Author: Luiz G. Mugnaini A. <luizmuganini@gmail.com>
+/// Author: Luiz G. Mugnaini A. <luizmugnaini@gmail.com>
 
 #pragma once
 
 #include <mina/gfx/context.h>
+#include <mina/window.h>
 #include <psh/arena.h>
 #include <psh/types.h>
 #include <vulkan/vulkan_core.h>
 
-namespace mina::gfx {
+namespace mina {
     void query_swap_chain_info(
-        psh::Arena*      arena,
         VkPhysicalDevice pdev,
         VkSurfaceKHR     surf,
+        psh::Arena*      arena,
         SwapChainInfo&   swc_info) noexcept;
 
-    void create_swap_chain(GraphicsContext& ctx, SwapChainInfo const& swc_info) noexcept;
+    void create_swap_chain(
+        VkDevice             dev,
+        VkSurfaceKHR         surf,
+        SwapChain&           swc,
+        QueueFamilies const& queues,
+        WindowHandle*        win_handle,
+        SwapChainInfo const& swc_info) noexcept;
 
-    void create_image_views(GraphicsContext& ctx) noexcept;
+    void destroy_swap_chain(VkDevice dev, SwapChain& swc) noexcept;
 
-    void create_frame_buffers(GraphicsContext& ctx) noexcept;
+    void create_image_views(VkDevice dev, SwapChain& swc, psh::Arena* persistent_arena) noexcept;
 
-    [[nodiscard]] bool prepare_frame_for_rendering(GraphicsContext& ctx) noexcept;
+    void recreate_image_views(VkDevice dev, SwapChain& swc) noexcept;
 
-    [[nodiscard]] bool present_frame(GraphicsContext& ctx) noexcept;
+    void create_frame_buffers(
+        VkDevice          dev,
+        SwapChain&        swc,
+        psh::Arena*       persistent_arena,
+        RenderPass const& gfx_pass) noexcept;
 
-    void destroy_swap_chain(GraphicsContext& ctx) noexcept;
-}  // namespace mina::gfx
+    void recreate_frame_buffers(VkDevice dev, SwapChain& swc, RenderPass const& gfx_pass) noexcept;
+
+    FrameStatus
+    prepare_frame_for_rendering(VkDevice dev, SwapChain& swc, FrameResources& resources) noexcept;
+
+    PresentStatus present_frame(
+        SwapChain&    swc,
+        Window const& win,
+        VkQueue       present_queue,
+        VkSemaphore   finished_gfx_pass) noexcept;
+
+    inline f32 aspect_ratio(SwapChain& swc) {
+        return static_cast<f32>(swc.extent.width / swc.extent.height);
+    }
+}  // namespace mina

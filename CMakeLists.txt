@@ -269,19 +269,19 @@ add_subdirectory("${THIRDPARTY_DIR}/presheaf")
 
 set(
     MINA_ENGINE_SRC
-    "${CMAKE_SOURCE_DIR}/src/gb.cc"
     "${CMAKE_SOURCE_DIR}/src/cartridge.cc"
     "${CMAKE_SOURCE_DIR}/src/memory_map.cc"
+    "${CMAKE_SOURCE_DIR}/src/window.cc"
     "${CMAKE_SOURCE_DIR}/src/cpu/dmg.cc"
+    "${CMAKE_SOURCE_DIR}/src/gfx/buffer.cc"
     "${CMAKE_SOURCE_DIR}/src/gfx/command.cc"
     "${CMAKE_SOURCE_DIR}/src/gfx/context.cc"
-    "${CMAKE_SOURCE_DIR}/src/gfx/gpu_buffer.cc"
+    "${CMAKE_SOURCE_DIR}/src/gfx/data.cc"
     "${CMAKE_SOURCE_DIR}/src/gfx/pipeline.cc"
     "${CMAKE_SOURCE_DIR}/src/gfx/swap_chain.cc"
     "${CMAKE_SOURCE_DIR}/src/gfx/sync.cc"
     "${CMAKE_SOURCE_DIR}/src/gfx/utils.cc"
     "${CMAKE_SOURCE_DIR}/src/gfx/vma.cc"
-    "${CMAKE_SOURCE_DIR}/src/gfx/window.cc"
 )
 
 set(MINA_EXE_SRC "${CMAKE_SOURCE_DIR}/src/main.cc")

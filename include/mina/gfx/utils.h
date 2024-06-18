@@ -17,30 +17,35 @@
 ///
 ///
 /// Description: Vulkan graphics utility functions and macros.
-/// Author: Luiz G. Mugnaini A. <luizmuganini@gmail.com>
+/// Author: Luiz G. Mugnaini A. <luizmugnaini@gmail.com>
 
 #pragma once
 
 #include <psh/arena.h>
+#include <psh/log.h>
 #include <psh/types.h>
 #include <vulkan/vulkan_core.h>
 
 #if defined(MINA_DEBUG) || defined(MINA_VULKAN_DEBUG)
-#    define mina_vk_assert(res)                                                        \
-        do {                                                                           \
-            VkResult vkres = (res);                                                    \
-            if (vkres != VK_SUCCESS) {                                                 \
-                psh_fatal_fmt(psh::ASSERT_FMT, #res, "Vulkan operation unsuccessful"); \
-                psh_abort();                                                  \
-            }                                                                          \
+#    define mina_vk_assert(res)                       \
+        do {                                          \
+            VkResult vkres = (res);                   \
+            if (vkres != VK_SUCCESS) {                \
+                psh::log_fmt(                         \
+                    {psh::LogLevel::LEVEL_FATAL},     \
+                    psh::ASSERT_FMT,                  \
+                    #res,                             \
+                    "Vulkan operation unsuccessful"); \
+                psh_abort();                          \
+            }                                         \
         } while (0)
-#    define mina_vk_assert_msg(res, msg)                     \
-        do {                                                 \
-            VkResult vkres = (res);                          \
-            if (vkres != VK_SUCCESS) {                       \
-                psh_fatal_fmt(psh::ASSERT_FMT, #res, (msg)); \
-                psh_abort();                        \
-            }                                                \
+#    define mina_vk_assert_msg(res, msg)                                                \
+        do {                                                                            \
+            VkResult vkres = (res);                                                     \
+            if (vkres != VK_SUCCESS) {                                                  \
+                psh::log_fmt(psh::LogLevel::LEVEL_FATAL, psh::ASSERT_FMT, #res, (msg)); \
+                psh_abort();                                                            \
+            }                                                                           \
         } while (0)
 #else
 #    define mina_vk_assert(res)          (void)(res)
@@ -49,7 +54,7 @@
 
 #define MINA_CLEAR_COLOR 1.0f, 0.0f, 1.0f, 1.0f
 
-namespace mina::gfx {
+namespace mina {
     bool has_validation_layers(
         psh::ScratchArena&&       sarena,
         psh::FatPtr<strptr const> layers) noexcept;
@@ -74,4 +79,4 @@ namespace mina::gfx {
         VkInstance                   instance,
         VkDebugUtilsMessengerEXT     dum,
         VkAllocationCallbacks const* alloc_cb) noexcept;
-}  // namespace mina::gfx
+}  // namespace mina

@@ -17,7 +17,7 @@
 ///
 ///
 /// Description: Game Boy's memory map.
-/// Author: Luiz G. Mugnaini A. <luizmuganini@gmail.com>
+/// Author: Luiz G. Mugnaini A. <luizmugnaini@gmail.com>
 
 #pragma once
 
@@ -697,5 +697,6 @@ namespace mina {
         InterruptEnable  ie{};
     };
 
-    void transfer_fixed_rom_bank(GbCart const& cart, MemoryMap& mmap) noexcept;
+    void                  transfer_fixed_rom_bank(Cartridge const& cart, MemoryMap& mmap) noexcept;
+    psh::Buffer<char, 11> extract_cart_title(MemoryMap& mmap) noexcept;
 }  // namespace mina

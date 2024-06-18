@@ -17,35 +17,54 @@
 ///
 ///
 /// Description: Vulkan graphics pipeline management layer.
-/// Author: Luiz G. Mugnaini A. <luizmuganini@gmail.com>
+/// Author: Luiz G. Mugnaini A. <luizmugnaini@gmail.com>
 
 #pragma once
 
-#include <mina/gfx/context.h>
-#include <psh/types.h>
+#include <mina/gfx/types.h>
 
-namespace mina::gfx {
+namespace mina {
+    // -----------------------------------------------------------------------------
+    // - Shader catalog -
+    // -----------------------------------------------------------------------------
+
     enum struct ShaderCatalog {
         TRIANGLE_VERTEX,
         TRIANGLE_FRAGMENT,
-        SHADER_CATALOG_COUNT,
+        SHADER_COUNT,
     };
 
-    constexpr strptr shader_path(ShaderCatalog sc) noexcept {
-        strptr s;
-        switch (sc) {
-            case ShaderCatalog::TRIANGLE_VERTEX:   s = "build/bin/triangle.vert.spv"; break;
-            case ShaderCatalog::TRIANGLE_FRAGMENT: s = "build/bin/triangle.frag.spv"; break;
-            default:                              psh_unreachable();
+    constexpr strptr shader_path(ShaderCatalog s) noexcept {
+        strptr path;
+        switch (s) {
+            case ShaderCatalog::TRIANGLE_VERTEX:   path = "build/bin/triangle.vert.spv"; break;
+            case ShaderCatalog::TRIANGLE_FRAGMENT: path = "build/bin/triangle.frag.spv"; break;
+            default:                               psh_unreachable();
         }
-        return s;
+        return path;
     }
+    // -----------------------------------------------------------------------------
+    // - Descriptor set management -
+    // -----------------------------------------------------------------------------
 
-    void create_graphics_pipeline(GraphicsContext& ctx) noexcept;
+    void create_descriptor_sets(
+        VkDevice              dev,
+        DescriptorSetManager& descriptor_sets,
+        Buffer const&         uniform_buf) noexcept;
 
-    void create_graphics_commands(GraphicsContext& ctx) noexcept;
+    void destroy_descriptor_sets(VkDevice dev, DescriptorSetManager& descriptor_sets) noexcept;
 
-    void submit_graphics_commands(GraphicsContext& ctx) noexcept;
+    // -----------------------------------------------------------------------------
+    // - Graphics pipeline context lifetime management -
+    // -----------------------------------------------------------------------------
 
-    void destroy_graphics_pipeline(GraphicsContext& ctx) noexcept;
-}  // namespace mina::gfx
+    void create_graphics_pipeline_context(
+        VkDevice              dev,
+        psh::Arena*           persistent_arena,
+        Pipeline&             graphics_pip,
+        DescriptorSetManager& descriptor_sets,
+        VkFormat              surf_fmt,
+        VkExtent2D            surf_ext) noexcept;
+
+    void destroy_graphics_pipeline_context(VkDevice dev, Pipeline& graphics_pip) noexcept;
+}  // namespace mina
