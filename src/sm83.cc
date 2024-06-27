@@ -15,13 +15,18 @@
 ///    with this program; if not, write to the Free Software Foundation, Inc.,
 ///    51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
 ///
+/// Description: Game Boy Sharp SM83 CPU implementation.
 ///
-/// Description: Game Boy DMG CPU implementation.
+/// Highly recommended reads for the decoding of opcodes:
+/// - [RGBDS, CPU opcode reference](https://rgbds.gbdev.io/docs/v0.7.0/gbz80.7)
+/// - [Decoding Game Boy Z80 Opcodes](
+///   https://gb-archive.github.io/salvage/decoding_gbz80_opcodes/Decoding%20Gamboy%20Z80%20Opcodes.html).
+///
 /// Author: Luiz G. Mugnaini A. <luizmugnaini@gmail.com>
 
-#include <mina/cpu/dmg.h>
+#include <mina/sm83.h>
 
-#include <mina/cpu/dmg_opcodes.h>
+#include <mina/sm83_opcodes.h>
 #include <psh/assert.h>
 #include <psh/bit.h>
 #include <psh/intrinsics.h>
@@ -29,38 +34,68 @@
 // TODO(luiz): implement cycle timing correctness.
 
 namespace mina {
+    // -----------------------------------------------------------------------------
+    // - Implementation details -
+    // -----------------------------------------------------------------------------
+
     namespace {
+        // -----------------------------------------------------------------------------
+        // - Registers -
+        // -----------------------------------------------------------------------------
+
         /// 8-bit registers in little-endian order.
-        enum struct Reg8 : u8 {
-            B      = 0x00,
-            C      = 0x01,
-            D      = 0x02,
-            E      = 0x03,
-            H      = 0x04,
-            L      = 0x05,
-            HL_PTR = 0x06,
-            A      = 0x07,
+        ///
+        /// The value of each 8-bit register corresponds to its offset in bytes from the start of
+        /// the register file. Note however that `HL_PTR` isn't an actual register and therefore
+        /// doesn't have an offset, so we put -1 and treat it as a separate case when dealing with
+        /// 8-bit registers.
+        enum struct Reg8 {
+            B      = 3,
+            C      = 2,
+            D      = 5,
+            E      = 4,
+            H      = 7,
+            L      = 6,
+            HL_PTR = -1,
+            A      = 1,
         };
 
         /// 16-bit registers.
+        ///
+        /// The value of each 16-bit register corresponds to its offset in bytes from the start of
+        /// the register file.
         enum struct Reg16 : u8 {
-            BC = 0x02,
-            DE = 0x04,
-            HL = 0x06,
-            SP = 0x08,
+            BC = 2,
+            DE = 4,
+            HL = 6,
+            SP = 8,
+        };
+
+        /// Alternate 16-bit register set.
+        ///
+        /// The value of each 16-bit register corresponds to its offset in bytes from the start of
+        /// the register file.
+        enum struct AltReg16 : u8 {
+            BC = 2,
+            DE = 4,
+            HL = 6,
+            AF = 0,
         };
 
         /// Register file flags.
+        ///
+        /// The value associated to each flag corresponds to its offset in bits from the start of
+        /// the flag register.
         enum struct Flag : u8 {
             /// The carry flag. Set in the following occasions:
             ///     * 8-bit addition is higher than 0xFF.
             ///     * 16-bit addition is higher than 0xFFFF.
             ///     * Result of subtraction or comparison is negative.
             ///     * If a shift operation shifts out a 0b1 valued bit.
-            C = 0x04,
-            H = 0x05,  ///< Indicates carry for the high nibble.
-            N = 0x06,  ///< If the last operation was a subtraction.
-            Z = 0x07,  ///< If the last operation result was zero.
+            C = 4,
+            H = 5,  ///< Indicates carry for the high nibble.
+            N = 6,  ///< If the last operation was a subtraction.
+            Z = 7,  ///< If the last operation result was zero.
         };
 
         /// Conditional execution.
@@ -73,47 +108,47 @@ namespace mina {
             C,
         };
 
-        /// 3-bit unsigned integer constant.
-        struct UConst3 {
-            u8 val     : 3 = 0b000;
-            u8 unused_ : 5;
-        };
-
         //---------------------------------------------------------------------
         // Memory operations.
         //---------------------------------------------------------------------
 
+/// Get the CPU memory map in bytes
 #define cpu_memory(cpu) reinterpret_cast<u8*>(&cpu.mmap)
 
+/// Write a byte to a given address in the CPU memory map.
 #define mmap_write_byte(cpu, dst_addr, val_u8)                                      \
     do {                                                                            \
         *(cpu_memory(cpu) + static_cast<uptr>(dst_addr)) = static_cast<u8>(val_u8); \
     } while (0)
 
-#define mmap_write_word(cpu, dst_addr, val_u16)              \
-    do {                                                     \
-        u16 addr__                      = (dst_addr);        \
-        u16 val__                       = (val_u16);         \
-        *(cpu_memory(cpu) + addr__)     = psh_u16_lo(val__); \
-        *(cpu_memory(cpu) + addr__ + 1) = psh_u16_hi(val__); \
+/// Write a word (16-bit) to a given address in the CPU memory map.
+#define mmap_write_word(cpu, dst_addr, val_u16)                  \
+    do {                                                         \
+        *(cpu_memory(cpu) + dst_addr)     = psh_u16_lo(val_u16); \
+        *(cpu_memory(cpu) + dst_addr + 1) = psh_u16_hi(val_u16); \
     } while (0)
 
-        u8 bus_read_byte(CPU& cpu, u16 addr) noexcept {
+        /// Read the byte at a given address in the CPU memory map.
+        u8 bus_read_byte(SM83& cpu, u16 addr) noexcept {
             u8 const* memory = cpu_memory(cpu);
             cpu.bus_addr     = addr;
             return memory[cpu.bus_addr];
         }
 
+/// Read the byte at the program counter and advance.
 #define bus_read_pc(cpu) bus_read_byte(cpu, cpu.regfile.pc++)
 
-        u8 bus_read_imm8(CPU& cpu) noexcept {
+        /// Read the immediate 8-bit value in the program counter, and advance 1 byte.
+        u8 bus_read_imm8(SM83& cpu) noexcept {
             u8 const* memory = cpu_memory(cpu);
             u8        bt     = memory[cpu.regfile.pc++];
             cpu.bus_addr     = cpu.regfile.pc;
             return bt;
         }
 
-        u16 bus_read_imm16(CPU& cpu) noexcept {
+        /// Read the immediate 16-bit value in the program counter (little-endian), and advance 2
+        /// bytes.
+        u16 bus_read_imm16(SM83& cpu) noexcept {
             u8 const* memory = cpu_memory(cpu);
             u8        lo     = memory[cpu.regfile.pc++];
             u8        hi     = memory[cpu.regfile.pc++];
@@ -125,19 +160,21 @@ namespace mina {
         // Register file operations.
         //---------------------------------------------------------------------
 
+/// Get the register file in bytes.
 #define cpu_regfile_memory(cpu) reinterpret_cast<u8*>(&cpu.regfile)
 
+/// Read the value of a 16-bit register.
 #define read_reg16(cpu, reg16)                                   \
     psh_u16_from_bytes(                                          \
         *(cpu_regfile_memory(cpu) + static_cast<u8>(reg16) + 1), \
         *(cpu_regfile_memory(cpu) + static_cast<u8>(reg16)))
 
-#define set_reg16(cpu, reg16, val_u16)                                   \
-    do {                                                                 \
-        u16 val__    = (val_u16);                                        \
-        u8* reg__    = cpu_regfile_memory(cpu) + static_cast<u8>(reg16); \
-        *(reg__)     = static_cast<u8>(psh_u16_lo(val__));               \
-        *(reg__ + 1) = static_cast<u8>(psh_u16_hi(val__));               \
+/// Set the value of a 16-bit register.
+#define set_reg16(cpu, reg16, val_u16)                                \
+    do {                                                              \
+        u8* reg__ = cpu_regfile_memory(cpu) + static_cast<u8>(reg16); \
+        reg__[0]  = static_cast<u8>(psh_u16_lo(val_u16));             \
+        reg__[1]  = static_cast<u8>(psh_u16_hi(val_u16));             \
     } while (0)
 
         // NOTE(luiz): Things are a bit weird with weird with 8-bit registers due to the convention
@@ -145,25 +182,23 @@ namespace mina {
         //             The ordering is as in `Reg8`, which doesn't reflect the memory layout of the
         //             register file. It's bad but what can I do about it...
 
-        u8 read_reg8(CPU& cpu, Reg8 reg) noexcept {
+        /// Read the value of an 8-bit register.
+        u8 read_reg8(SM83& cpu, Reg8 reg) noexcept {
             u8 val;
             if (reg == Reg8::HL_PTR) {
                 val = bus_read_byte(cpu, read_reg16(cpu, Reg16::HL));
-            } else if (reg == Reg8::A) {
-                val = cpu.regfile.a;
             } else {
                 val = *(cpu_regfile_memory(cpu) + static_cast<u8>(reg));
             }
             return val;
         }
 
-        void set_reg8(CPU& cpu, Reg8 reg, u8 val) noexcept {
+        /// Set the value of an 8-bit register.
+        void set_reg8(SM83& cpu, Reg8 reg, u8 val) noexcept {
             if (reg == Reg8::HL_PTR) {
                 u8* memory       = cpu_memory(cpu);
                 u16 addr         = read_reg16(cpu, Reg16::HL);
                 *(memory + addr) = val;
-            } else if (reg == Reg8::A) {
-                cpu.regfile.a = val;
             } else {
                 *(cpu_regfile_memory(cpu) + static_cast<u8>(reg)) = val;
             }
@@ -173,50 +208,82 @@ namespace mina {
         // Register flag operations.
         //---------------------------------------------------------------------
 
+#define test_flag(cpu, flag)  static_cast<bool>(read_flag(cpu, flag))
 #define read_flag(cpu, flag)  psh_bit_at(cpu.regfile.f, static_cast<u8>(flag))
 #define set_flag(cpu, flag)   psh_bit_set(cpu.regfile.f, static_cast<u8>(flag))
 #define clear_flag(cpu, flag) psh_bit_clear(cpu.regfile.f, static_cast<u8>(flag))
 #define set_or_clear_flag_if(cpu, flag, cond) \
     psh_bit_set_or_clear_if(cpu.regfile.f, static_cast<u8>(flag), cond)
-
 #define clear_all_flags(cpu)  \
     do {                      \
         cpu.regfile.f = 0x00; \
     } while (0)
 
-        bool read_condition_flag(CPU& cpu, Cond cc) {
+        /// Get the conditional result of a flag being set or not.
+        bool read_condition_flag(SM83& cpu, Cond cc) {
             bool res;
             switch (cc) {
                 case Cond::NZ: res = (read_flag(cpu, Flag::Z) == 0); break;
-                case Cond::Z:  res = (read_flag(cpu, Flag::Z) != 0); break;
+                case Cond::Z:  res = (read_flag(cpu, Flag::Z) == 1); break;
                 case Cond::NC: res = (read_flag(cpu, Flag::C) == 0); break;
-                case Cond::C:  res = (read_flag(cpu, Flag::C) != 0); break;
+                case Cond::C:  res = (read_flag(cpu, Flag::C) == 1); break;
             }
             return res;
         }
 
+        // -----------------------------------------------------------------------------
+        // - Register decoding. -
+        // -----------------------------------------------------------------------------
+
+        /// 8-bit register decoding mapping.
+        ///
+        /// Maps the encoded 8-bit register into its corresponding register.
+        constexpr Reg8 DECODE_REG8[8] =
+            {Reg8::B, Reg8::C, Reg8::D, Reg8::E, Reg8::H, Reg8::L, Reg8::HL_PTR, Reg8::A};
+
+        /// 16-bit register decoding mapping.
+        ///
+        /// As part of the decoding process, in order to obtain the referenced 16-bit register, we
+        /// have to look at the bits 4 and 5 of the opcode --- denoted in `decode_and_execute` by
+        /// the variable `p`. This variable can assume values between 0 and 3, therefore we have to
+        /// map those into the corresponding `Reg16` enum value.
+        constexpr Reg16 DECODE_REG16[4] = {
+            Reg16::BC,
+            Reg16::DE,
+            Reg16::HL,
+            Reg16::SP,
+        };
+
+        /// Alternate 16-bit register decoding mapping, used for instructions such as push and pop.
+        constexpr AltReg16 DECODE_ALT_REG16[4] = {
+            AltReg16::BC,
+            AltReg16::DE,
+            AltReg16::HL,
+            AltReg16::AF,
+        };
+
         //---------------------------------------------------------------------
-        // Decode and execute instructions.
+        // Instruction decoding and execution.
         //---------------------------------------------------------------------
 
-        // Decode and execute 0xCB-prefixed instructions.
-        void cb_dexec(CPU& cpu) {
-            // Byte next to the `0xCB` prefix code.
-            u8 data = bus_read_pc(cpu);
-
+        /// Decode and execute 0xCB-prefixed instructions.
+        inline void cb_decode_and_execute(SM83& cpu, u8 data) {
             // The 8-bit register that the instruction will act upon.
-            Reg8 reg = static_cast<Reg8>(psh_bits_at(data, 0, 3));
+            u8   y   = psh_bits_at(data, 0, 3);
+            Reg8 reg = DECODE_REG8[y];
 
-            CBPrefixed operation_kind = static_cast<CBPrefixed>(psh_bits_at(data, 6, 2));
+            CBPrefixed operation_kind = static_cast<CBPrefixed>(psh_bits_at(data, 6, 8));
             switch (operation_kind) {
+                // Rotate/shift a register value or memory.
                 case CBPrefixed::ROT: {
                     // Decode the rotation operation that should be execution.
-                    CBRot rot_op = static_cast<CBRot>(psh_bits_at(data, 3, 3));
+                    CBRot rot_op = static_cast<CBRot>(psh_bit_at(data, 3));
 
                     switch (rot_op) {
+                        // Rotate left with carry.
                         case CBRot::RLC: {
                             u8 res                  = read_reg8(cpu, reg);
-                            u8 reg_last_bit_was_set = (psh_bit_at(res, 7) != 0);
+                            u8 reg_last_bit_was_set = psh_test_bit_at(res, 7);
 
                             res = psh_int_rotl(res, 1);
                             set_reg8(cpu, reg, res);
@@ -226,9 +293,11 @@ namespace mina {
                             set_or_clear_flag_if(cpu, Flag::C, reg_last_bit_was_set);
                             break;
                         }
+
+                        // Rotate right with carry.
                         case CBRot::RRC: {
                             u8 res                   = read_reg8(cpu, reg);
-                            u8 reg_first_bit_was_set = (psh_bit_at(res, 0) != 0);
+                            u8 reg_first_bit_was_set = psh_test_bit_at(res, 0);
 
                             res = psh_int_rotr(res, 1);
                             set_reg8(cpu, reg, res);
@@ -238,12 +307,14 @@ namespace mina {
                             set_or_clear_flag_if(cpu, Flag::C, reg_first_bit_was_set);
                             break;
                         }
+
+                        // Rotate left through the carry flag.
                         case CBRot::RL: {
                             u8   res                  = read_reg8(cpu, reg);
-                            bool reg_last_bit_was_set = (psh_bit_at(res, 7) != 0);
+                            bool reg_last_bit_was_set = psh_test_bit_at(res, 7);
 
                             res = psh_int_rotl(res, 1);
-                            if (read_flag(cpu, Flag::C) != 0) {
+                            if (test_flag(cpu, Flag::C)) {
                                 psh_bit_set(res, 0);  // Set the first bit.
                             }
                             set_reg8(cpu, reg, res);
@@ -253,12 +324,14 @@ namespace mina {
                             set_or_clear_flag_if(cpu, Flag::C, reg_last_bit_was_set);
                             break;
                         }
+
+                        // Rotate right through the carry flag.
                         case CBRot::RR: {
                             u8   res                   = read_reg8(cpu, reg);
-                            bool reg_first_bit_was_set = (psh_bit_at(res, 0) != 0);
+                            bool reg_first_bit_was_set = psh_test_bit_at(res, 0);
 
                             res = psh_int_rotr(res, 1);
-                            if (read_flag(cpu, Flag::C) != 0) {
+                            if (test_flag(cpu, Flag::C)) {
                                 psh_bit_set(res, 7);  // Set the last bit.
                             }
                             set_reg8(cpu, reg, res);
@@ -268,9 +341,11 @@ namespace mina {
                             set_or_clear_flag_if(cpu, Flag::C, reg_first_bit_was_set);
                             break;
                         }
+
+                        // Shift left arithmetically, with carry.
                         case CBRot::SLA: {
                             u8   res                  = read_reg8(cpu, reg);
-                            bool reg_last_bit_was_set = (psh_bit_at(res, 7) != 0);
+                            bool reg_last_bit_was_set = psh_test_bit_at(res, 7);
 
                             res <<= 1;
                             set_reg8(cpu, reg, res);
@@ -280,9 +355,11 @@ namespace mina {
                             set_or_clear_flag_if(cpu, Flag::C, reg_last_bit_was_set);
                             break;
                         }
+
+                        // Shift right arithmetically, with carry.
                         case CBRot::SRA: {
                             u8   res                   = read_reg8(cpu, reg);
-                            bool reg_first_bit_was_set = (psh_bit_at(res, 0) != 0);
+                            bool reg_first_bit_was_set = psh_test_bit_at(res, 0);
 
                             res >>= 1;
                             set_reg8(cpu, reg, res);
@@ -292,6 +369,8 @@ namespace mina {
                             set_or_clear_flag_if(cpu, Flag::C, reg_first_bit_was_set);
                             break;
                         }
+
+                        // Swap the value of the low and high nibbles.
                         case CBRot::SWAP: {
                             u8 res = read_reg8(cpu, reg);
                             res    = psh_u8_from_nibbles(psh_u8_lo(res), psh_u8_hi(res));
@@ -301,9 +380,11 @@ namespace mina {
                             set_or_clear_flag_if(cpu, Flag::Z, res == 0);
                             break;
                         }
+
+                        // Shift right logically, with carry.
                         case CBRot::SRL: {
                             u8   res                   = read_reg8(cpu, reg);
-                            bool reg_first_bit_was_set = (psh_bit_at(res, 0) != 0);
+                            bool reg_first_bit_was_set = psh_test_bit_at(res, 0);
 
                             res >>= 1;
                             set_reg8(cpu, reg, res);
@@ -315,35 +396,59 @@ namespace mina {
                         }
                     }
                 }
+
+                // Test if a given bit of the value of a register is set or clear.
                 case CBPrefixed::BIT: {
-                    u8 bit_pos = psh_bits_at(data, 3, 5);
-                    psh_todo_msg("continue BIT op");
+                    u8   test_bit_pos = psh_bits_at(data, 3, 5);
+                    bool is_set       = psh_test_bit_at(read_reg8(cpu, reg), test_bit_pos);
+
+                    set_flag(cpu, Flag::H);
+                    clear_flag(cpu, Flag::N);
+                    set_or_clear_flag_if(cpu, Flag::Z, !is_set);
                     break;
                 }
-                // TODO(luiz): implement RES and SET.
-                case CBPrefixed::RES: psh_todo_msg("CB RES");
-                case CBPrefixed::SET: psh_todo_msg("CB SET");
+
+                // Clear a bit of a register to 0.
+                case CBPrefixed::RES: {
+                    u8 clear_bit_pos = psh_bits_at(data, 3, 5);
+                    u8 res           = read_reg8(cpu, reg) & psh_not_bit(u8, clear_bit_pos);
+                    set_reg8(cpu, reg, res);
+                    break;
+                }
+
+                // Set a bit of a register to 1.
+                case CBPrefixed::SET: {
+                    u8 set_bit_pos = psh_bits_at(data, 3, 5);
+                    u8 res         = read_reg8(cpu, reg) | psh_bit(u8, set_bit_pos);
+                    set_reg8(cpu, reg, res);
+                    break;
+                }
             }
         }
 
-        void dexec(CPU& cpu, u8 data) noexcept {
+        /// Decode and execute instructions
+        void decode_and_execute(SM83& cpu, u8 data) noexcept {
             Opcode op = static_cast<Opcode>(data);
 
-            // Strip information out of the opcode byte.
+            // Strip information out of the opcode.
             u8 y = psh_bits_at(data, 3, 3);
             u8 p = psh_bits_at(y, 1, 2);
             u8 z = psh_bits_at(data, 0, 3);
 
             switch (op) {
                 // Do nothing.
-                case Opcode::NOP:         break;
+                case Opcode::NOP:  break;
 
-                // Halt is caused by a LD [HL] [HL] instruction.
+                // LD R8 R8.
                 //
-                // NOTE(luiz): Please, do not change the the position of this instruction case with
-                //             respect to the below LD R8 R8 instructions as it'll be the only
-                //             exception to the pattern.
-                case Opcode::HALT:        psh_todo_msg("HALT");
+                // Exception: Halt is caused by a LD [HL] [HL] instruction. For this reason we put
+                //            it as the first case, in order to break earlier from the switch. For
+                //            this reason, do not change the position of `case Opcode::HALT` with
+                //            respect to the remaining LD R8 R8 instructions.
+                case Opcode::HALT: {
+                    psh_todo_msg("HALT");
+                    break;
+                }
                 case Opcode::LD_B_B:
                 case Opcode::LD_B_C:
                 case Opcode::LD_B_D:
@@ -407,7 +512,7 @@ namespace mina {
                 case Opcode::LD_A_L:
                 case Opcode::LD_A_HL_PTR:
                 case Opcode::LD_A_A:      {
-                    set_reg8(cpu, static_cast<Reg8>(y), read_reg8(cpu, static_cast<Reg8>(z)));
+                    set_reg8(cpu, DECODE_REG8[y], read_reg8(cpu, DECODE_REG8[z]));
                     break;
                 }
 
@@ -420,7 +525,7 @@ namespace mina {
                 case Opcode::LD_L_U8:
                 case Opcode::LD_HL_PTR_U8:
                 case Opcode::LD_A_U8:      {
-                    set_reg8(cpu, static_cast<Reg8>(y), bus_read_imm8(cpu));
+                    set_reg8(cpu, DECODE_REG8[y], bus_read_imm8(cpu));
                     break;
                 }
 
@@ -429,7 +534,7 @@ namespace mina {
                 case Opcode::LD_DE_U16:
                 case Opcode::LD_HL_U16:
                 case Opcode::LD_SP_U16: {
-                    set_reg16(cpu, static_cast<Reg16>(p), bus_read_imm16(cpu));
+                    set_reg16(cpu, DECODE_REG16[p], bus_read_imm16(cpu));
                     break;
                 }
 
@@ -448,8 +553,8 @@ namespace mina {
                     set_reg16(cpu, Reg16::SP, static_cast<u16>(res));
                     set_reg16(cpu, Reg16::HL, static_cast<u16>(res));
 
-                    clear_flag(cpu, Flag::Z);
                     clear_flag(cpu, Flag::N);
+                    clear_flag(cpu, Flag::Z);
                     set_or_clear_flag_if(cpu, Flag::C, res > 0xFFFF);
                     set_or_clear_flag_if(
                         cpu,
@@ -608,13 +713,13 @@ namespace mina {
                 case Opcode::INC_L:
                 case Opcode::INC_HL_PTR:
                 case Opcode::INC_A:      {
-                    Reg8 reg      = static_cast<Reg8>(y);
+                    Reg8 reg      = DECODE_REG8[y];
                     u8   prev_val = read_reg8(cpu, reg);
                     set_reg8(cpu, reg, prev_val + 1);
 
                     clear_flag(cpu, Flag::N);
-                    set_or_clear_flag_if(cpu, Flag::Z, prev_val + 1 == 0);
                     set_or_clear_flag_if(cpu, Flag::H, psh_u8_lo(prev_val) + 1 > 0x0F);
+                    set_or_clear_flag_if(cpu, Flag::Z, prev_val + 1 == 0);
                     break;
                 }
 
@@ -623,7 +728,7 @@ namespace mina {
                 case Opcode::INC_DE:
                 case Opcode::INC_HL:
                 case Opcode::INC_SP: {
-                    Reg16 reg = static_cast<Reg16>(p);
+                    Reg16 reg = DECODE_REG16[p];
                     set_reg16(cpu, reg, read_reg16(cpu, reg) + 1);
                     break;
                 }
@@ -637,13 +742,13 @@ namespace mina {
                 case Opcode::DEC_L:
                 case Opcode::DEC_HL_PTR:
                 case Opcode::DEC_A:      {
-                    Reg8 reg      = static_cast<Reg8>(y);
+                    Reg8 reg      = DECODE_REG8[y];
                     u8   prev_val = read_reg8(cpu, reg);
                     set_reg8(cpu, reg, prev_val - 1);
 
                     set_flag(cpu, Flag::N);
-                    set_or_clear_flag_if(cpu, Flag::Z, prev_val - 1 == 0);
                     set_or_clear_flag_if(cpu, Flag::H, psh_u8_lo(prev_val) - 1 > 0x0F);
+                    set_or_clear_flag_if(cpu, Flag::Z, prev_val - 1 == 0);
                     break;
                 }
 
@@ -652,7 +757,7 @@ namespace mina {
                 case Opcode::DEC_DE:
                 case Opcode::DEC_HL:
                 case Opcode::DEC_SP: {
-                    Reg16 reg = static_cast<Reg16>(p);
+                    Reg16 reg = DECODE_REG16[p];
                     set_reg16(cpu, reg, read_reg16(cpu, reg) - 1);
                     break;
                 }
@@ -666,7 +771,7 @@ namespace mina {
                 case Opcode::ADD_A_L:
                 case Opcode::ADD_A_HL_PTR:
                 case Opcode::ADD_A_A:      {
-                    Reg8 reg      = static_cast<Reg8>(z);
+                    Reg8 reg      = DECODE_REG8[z];
                     u8   val      = read_reg8(cpu, reg);
                     u8   acc      = cpu.regfile.a;
                     u16  res      = static_cast<u16>(acc + val);
@@ -711,7 +816,7 @@ namespace mina {
                 case Opcode::ADD_HL_DE:
                 case Opcode::ADD_HL_HL:
                 case Opcode::ADD_HL_SP: {
-                    Reg16 reg = static_cast<Reg16>(p);
+                    Reg16 reg = DECODE_REG16[p];
                     u16   val = read_reg16(cpu, reg);
                     u16   hl  = read_reg16(cpu, Reg16::HL);
                     set_reg16(cpu, Reg16::HL, static_cast<u16>(hl + val));
@@ -722,8 +827,8 @@ namespace mina {
                     break;
                 }
 
-                // Add, considering the carry flag, the value contained in a given 8-bit register to
-                // the accumulator register.
+                // Add to the accumulator register, considering the carry flag, the value of an
+                // 8-bit register.
                 case Opcode::ADC_A_B:
                 case Opcode::ADC_A_C:
                 case Opcode::ADC_A_D:
@@ -732,7 +837,7 @@ namespace mina {
                 case Opcode::ADC_A_L:
                 case Opcode::ADC_A_HL_PTR:
                 case Opcode::ADC_A_A:      {
-                    Reg8 reg      = static_cast<Reg8>(z);
+                    Reg8 reg      = DECODE_REG8[z];
                     u8   val      = read_reg8(cpu, reg);
                     u8   acc      = cpu.regfile.a;
                     u8   carry    = read_flag(cpu, Flag::C);
@@ -740,12 +845,12 @@ namespace mina {
                     cpu.regfile.a = static_cast<u8>(res);
 
                     clear_all_flags(cpu);
-                    set_or_clear_flag_if(cpu, Flag::Z, res == 0);
+                    set_or_clear_flag_if(cpu, Flag::C, res > 0x00FF);
                     set_or_clear_flag_if(
                         cpu,
                         Flag::H,
                         (psh_u8_lo(acc) + psh_u8_lo(val) + carry) > 0x0F);
-                    set_or_clear_flag_if(cpu, Flag::C, res > 0x00FF);
+                    set_or_clear_flag_if(cpu, Flag::Z, res == 0);
                     break;
                 }
 
@@ -758,17 +863,16 @@ namespace mina {
                     cpu.regfile.a = static_cast<u8>(res);
 
                     clear_all_flags(cpu);
-                    set_or_clear_flag_if(cpu, Flag::Z, res == 0);
+                    set_or_clear_flag_if(cpu, Flag::C, res > 0x00FF);
                     set_or_clear_flag_if(
                         cpu,
                         Flag::H,
                         (psh_u8_lo(acc) + psh_u8_lo(val) + carry) > 0x0F);
-                    set_or_clear_flag_if(cpu, Flag::C, res > 0x00FF);
+                    set_or_clear_flag_if(cpu, Flag::Z, res == 0);
                     break;
                 }
 
-                // Subtract the value contained in a given 8-bit register from the accumulator
-                // register.
+                // Subtract from the accumulator register the value of an 8-bit register.
                 case Opcode::SUB_A_B:
                 case Opcode::SUB_A_C:
                 case Opcode::SUB_A_D:
@@ -777,15 +881,15 @@ namespace mina {
                 case Opcode::SUB_A_L:
                 case Opcode::SUB_A_HL_PTR:
                 case Opcode::SUB_A_A:      {
-                    Reg8 reg = static_cast<Reg8>(z);
+                    Reg8 reg = DECODE_REG8[z];
                     u8   val = read_reg8(cpu, reg);
                     u8   acc = cpu.regfile.a;
                     cpu.regfile.a -= val;
 
                     set_flag(cpu, Flag::N);
-                    set_or_clear_flag_if(cpu, Flag::Z, cpu.regfile.a == 0);
-                    set_or_clear_flag_if(cpu, Flag::H, psh_u8_lo(val) > psh_u8_lo(acc));
                     set_or_clear_flag_if(cpu, Flag::C, val > acc);
+                    set_or_clear_flag_if(cpu, Flag::H, psh_u8_lo(val) > psh_u8_lo(acc));
+                    set_or_clear_flag_if(cpu, Flag::Z, cpu.regfile.a == 0);
                     break;
                 }
 
@@ -796,14 +900,14 @@ namespace mina {
                     cpu.regfile.a -= val;
 
                     set_flag(cpu, Flag::N);
-                    set_or_clear_flag_if(cpu, Flag::Z, cpu.regfile.a == 0);
-                    set_or_clear_flag_if(cpu, Flag::H, psh_u8_lo(val) > psh_u8_lo(acc));
                     set_or_clear_flag_if(cpu, Flag::C, val > acc);
+                    set_or_clear_flag_if(cpu, Flag::H, psh_u8_lo(val) > psh_u8_lo(acc));
+                    set_or_clear_flag_if(cpu, Flag::Z, cpu.regfile.a == 0);
                     break;
                 }
 
-                // Subtract, considering the carry flag, the value contained in a given 8-bit
-                // register from the accumulator register.
+                // Subtract from the accumulator register, considering the carry flag, the value
+                // of an 8-bit register.
                 case Opcode::SBC_A_B:
                 case Opcode::SBC_A_C:
                 case Opcode::SBC_A_D:
@@ -812,19 +916,21 @@ namespace mina {
                 case Opcode::SBC_A_L:
                 case Opcode::SBC_A_HL_PTR:
                 case Opcode::SBC_A_A:      {
-                    Reg8 reg   = static_cast<Reg8>(z);
+                    Reg8 reg   = DECODE_REG8[z];
                     u8   val   = read_reg8(cpu, reg);
                     u8   acc   = cpu.regfile.a;
                     u8   carry = read_flag(cpu, Flag::C);
                     cpu.regfile.a -= val - carry;
 
                     set_flag(cpu, Flag::N);
-                    set_or_clear_flag_if(cpu, Flag::Z, cpu.regfile.a == 0);
-                    set_or_clear_flag_if(cpu, Flag::H, psh_u8_lo(val) + carry > psh_u8_lo(acc));
                     set_or_clear_flag_if(cpu, Flag::C, val + carry > acc);
+                    set_or_clear_flag_if(cpu, Flag::H, psh_u8_lo(val) + carry > psh_u8_lo(acc));
+                    set_or_clear_flag_if(cpu, Flag::Z, cpu.regfile.a == 0);
                     break;
                 }
 
+                /// Subtract from the accumulator register, considering the carry flag, the
+                /// immediate 8-bit value.
                 case Opcode::SBC_A_U8: {
                     u8 val   = bus_read_imm8(cpu);
                     u8 acc   = cpu.regfile.a;
@@ -832,9 +938,9 @@ namespace mina {
                     cpu.regfile.a -= val - carry;
 
                     set_flag(cpu, Flag::N);
-                    set_or_clear_flag_if(cpu, Flag::Z, cpu.regfile.a == 0);
-                    set_or_clear_flag_if(cpu, Flag::H, psh_u8_lo(val) + carry > psh_u8_lo(acc));
                     set_or_clear_flag_if(cpu, Flag::C, val + carry > acc);
+                    set_or_clear_flag_if(cpu, Flag::H, psh_u8_lo(val) + carry > psh_u8_lo(acc));
+                    set_or_clear_flag_if(cpu, Flag::Z, cpu.regfile.a == 0);
                     break;
                 }
 
@@ -846,7 +952,7 @@ namespace mina {
                 case Opcode::AND_A_L:
                 case Opcode::AND_A_HL_PTR:
                 case Opcode::AND_A_A:      {
-                    Reg8 reg = static_cast<Reg8>(z);
+                    Reg8 reg = DECODE_REG8[z];
                     u8   val = read_reg8(cpu, reg);
                     cpu.regfile.a &= val;
 
@@ -873,7 +979,7 @@ namespace mina {
                 case Opcode::XOR_A_L:
                 case Opcode::XOR_A_HL_PTR:
                 case Opcode::XOR_A_A:      {
-                    Reg8 reg = static_cast<Reg8>(z);
+                    Reg8 reg = DECODE_REG8[z];
                     u8   val = read_reg8(cpu, reg);
                     cpu.regfile.a ^= val;
 
@@ -898,7 +1004,7 @@ namespace mina {
                 case Opcode::OR_A_L:
                 case Opcode::OR_A_HL_PTR:
                 case Opcode::OR_A_A:      {
-                    Reg8 reg = static_cast<Reg8>(z);
+                    Reg8 reg = DECODE_REG8[z];
                     u8   val = read_reg8(cpu, reg);
                     cpu.regfile.a |= val;
 
@@ -924,13 +1030,13 @@ namespace mina {
                 case Opcode::CP_A_L:
                 case Opcode::CP_A_HL_PTR:
                 case Opcode::CP_A_A:      {
-                    Reg8 reg = static_cast<Reg8>(z);
+                    Reg8 reg = DECODE_REG8[z];
                     u8   val = read_reg8(cpu, reg);
 
                     set_flag(cpu, Flag::N);
-                    set_or_clear_flag_if(cpu, Flag::Z, cpu.regfile.a == val);
                     set_or_clear_flag_if(cpu, Flag::C, val > cpu.regfile.a);
                     set_or_clear_flag_if(cpu, Flag::H, psh_u8_lo(val) > psh_u8_lo(cpu.regfile.a));
+                    set_or_clear_flag_if(cpu, Flag::Z, cpu.regfile.a == val);
                     break;
                 }
 
@@ -938,15 +1044,14 @@ namespace mina {
                     u8 val = bus_read_imm8(cpu);
 
                     set_flag(cpu, Flag::N);
-                    set_or_clear_flag_if(cpu, Flag::Z, cpu.regfile.a == val);
                     set_or_clear_flag_if(cpu, Flag::C, val > cpu.regfile.a);
                     set_or_clear_flag_if(cpu, Flag::H, psh_u8_lo(val) > psh_u8_lo(cpu.regfile.a));
+                    set_or_clear_flag_if(cpu, Flag::Z, cpu.regfile.a == val);
                     break;
                 }
 
-                // TODO(luiz): Implement the remaining instructions.
                 case Opcode::RLCA: {
-                    bool will_carry = (psh_bit_at(cpu.regfile.a, 7) != 0);
+                    bool will_carry = psh_test_bit_at(cpu.regfile.a, 7);
                     cpu.regfile.a   = psh_int_rotl(cpu.regfile.a, 1);
 
                     clear_all_flags(cpu);
@@ -954,7 +1059,7 @@ namespace mina {
                     break;
                 }
                 case Opcode::RRCA: {
-                    bool will_carry = (psh_bit_at(cpu.regfile.a, 0) != 0);
+                    bool will_carry = psh_test_bit_at(cpu.regfile.a, 0);
                     cpu.regfile.a   = psh_int_rotr(cpu.regfile.a, 1);
 
                     clear_all_flags(cpu);
@@ -963,10 +1068,10 @@ namespace mina {
                 }
 
                 case Opcode::RLA: {
-                    bool acc_last_bit_was_set = (psh_bit_at(cpu.regfile.a, 7) != 0);
+                    bool acc_last_bit_was_set = psh_test_bit_at(cpu.regfile.a, 7);
 
                     cpu.regfile.a = psh_int_rotl(cpu.regfile.a, 1);
-                    if (read_flag(cpu, Flag::C) != 0) {
+                    if (test_flag(cpu, Flag::C)) {
                         psh_bit_set(cpu.regfile.a, 0);  // Set the first bit.
                     }
 
@@ -975,10 +1080,10 @@ namespace mina {
                     break;
                 }
                 case Opcode::RRA: {
-                    bool acc_first_bit_was_set = (psh_bit_at(cpu.regfile.a, 0) != 0);
+                    bool acc_first_bit_was_set = psh_test_bit_at(cpu.regfile.a, 0);
 
                     cpu.regfile.a = psh_int_rotr(cpu.regfile.a, 1);
-                    if (read_flag(cpu, Flag::C) != 0) {
+                    if (test_flag(cpu, Flag::C)) {
                         psh_bit_set(cpu.regfile.a, 7);  // Set the last bit.
                     }
 
@@ -990,14 +1095,69 @@ namespace mina {
                 // Decimal adjust the accumulator.
                 //
                 // Adjust the accumulator to get a correct binary coded decimal (BCD)
-                // representation.
+                // representation. This is probably the strangest instruction, so I'll explain in
+                // more detail below.
                 //
-                // NOTE(luiz): BCD is completely stupid, it basically takes the decimal
-                //             representation into the binary world. For instance, 32 is 0b0010_0000
-                //             but in BCD representation it is 0b0011_0010 where the high nibble
-                //             0b0011 is 3 and the low nibble 0b0010 is 2 (forming 32, get it?).
+                // NOTE(luiz): BCD is completely stupid and inefficient. TL;DR BCD the decimal
+                //             representation into the binary/hex world. For instance, 32 is
+                //             0b0010_0000 but in BCD representation it is 0b0011_0010 where the
+                //             high nibble 0b0011 is 3 and the low nibble 0b0010 is 2 (forming 32,
+                //             get it?).
+                //
+                // Non-subtraction adjustment (flag N clear):
+                //
+                // - Low nibble: in BCD a low nibble can have value at most 0x09. Due to this, if
+                //   the last operation had a half carry or the low nibble is greater than 0x09 then
+                //   we have to add 0x06 to the value in order to transfer the sparing bits from the
+                //   low nibble to the high nibble.
+                //
+                //   Essentially, this is the same as mapping 0x0A, 0x0B, 0x0C, 0x0D, 0x0E, and 0x0F
+                //   to the hexadecimals 0x00, 0x10, ..., and 0x50. Note that in doing this we may
+                //   get a high nibble which doesn't fit in the BCD format, so we'll have to adjust
+                //   it next.
+                //
+                // - High nibble: since the high nibble can be at most 0x90, either if the last
+                //   operation had a carry or the high nibble is greater than 0x09, we have to
+                //   adjust the hexadecimal representation in order to fit the BCD. In order to
+                //   achieve this we add 0x60 to the value, which essentially maps the hexadecimals
+                //   0xA0, ..., 0xF0 to the values 0x00, ..., 0x05.
+                //
+                // Subtraction adjustment (flag N set):
+                //
+                // - Low nibble: if a half carry occurred in the last subtraction, we have to shift
+                //   our low nibble back to the range of 0x00 and 0x09. In order to do so, 0x0F
+                //   should be mapped to 0x09. This gives us a clue that we may subtract 0x06 from
+                //   our value. This gives us a mapping from 0x0A, ..., 0x0F to 0x04, ..., 0x09.
+                //
+                // - High nibble: using an analogous reasoning as before, if a carry occurred we
+                //   subtract 0x60 from our value in order to adjust its high nibble.
                 case Opcode::DAA: {
+                    constexpr u8 LOW_NIBBLE_ADJUST = 0x06;
+                    constexpr u8 HI_NIBBLE_ADJUST  = 0x60;
+
+                    u16 res = static_cast<u16>(cpu.regfile.a);
+                    if (test_flag(cpu, Flag::N)) {
+                        if (test_flag(cpu, Flag::H)) {
+                            res -= LOW_NIBBLE_ADJUST;
+                        }
+
+                        if (test_flag(cpu, Flag::C)) {
+                            res -= HI_NIBBLE_ADJUST;
+                        }
+                    } else {
+                        if (test_flag(cpu, Flag::H) || (res & 0x0F) > 0x09) {
+                            res += LOW_NIBBLE_ADJUST;
+                        }
+
+                        if (test_flag(cpu, Flag::C) || (res & 0xFFF0) > 0x90) {
+                            res += HI_NIBBLE_ADJUST;
+                        }
+                    }
+                    cpu.regfile.a = psh_u16_lo(res);
+
                     clear_flag(cpu, Flag::H);
+                    set_or_clear_flag_if(cpu, Flag::C, res > 0x99);
+                    set_or_clear_flag_if(cpu, Flag::Z, cpu.regfile.a == 0);
                     break;
                 }
 
@@ -1013,6 +1173,7 @@ namespace mina {
                 // Set the carry flag
                 case Opcode::SCF: {
                     set_flag(cpu, Flag::C);
+
                     clear_flag(cpu, Flag::H);
                     clear_flag(cpu, Flag::N);
                     break;
@@ -1020,26 +1181,25 @@ namespace mina {
 
                 // Invert the carry flag.
                 case Opcode::CCF: {
+                    cpu.regfile.f ^= psh_bit(u8, static_cast<u8>(Flag::C));
+
+                    clear_flag(cpu, Flag::H);
+                    clear_flag(cpu, Flag::N);
+                    break;
+                }
+
+                // Write the 16-bit register value to the stack.
+                case Opcode::PUSH_BC:
+                case Opcode::PUSH_DE:
+                case Opcode::PUSH_HL:
+                case Opcode::PUSH_AF: {
+                    u16 val = read_reg16(cpu, DECODE_ALT_REG16[p]);
+                    cpu.regfile.sp -= 2;
+                    mmap_write_word(cpu, cpu.regfile.sp, val);
                     break;
                 }
 
                 case Opcode::RET_NZ: {
-                    psh_todo();
-                    break;
-                }
-                case Opcode::POP_BC: {
-                    psh_todo();
-                    break;
-                }
-                case Opcode::CALL_NZ_U16: {
-                    psh_todo();
-                    break;
-                }
-                case Opcode::PUSH_BC: {
-                    psh_todo();
-                    break;
-                }
-                case Opcode::RST_0x00: {
                     psh_todo();
                     break;
                 }
@@ -1051,35 +1211,7 @@ namespace mina {
                     psh_todo();
                     break;
                 }
-                case Opcode::CALL_Z_U16: {
-                    psh_todo();
-                    break;
-                }
-                case Opcode::CALL_U16: {
-                    psh_todo();
-                    break;
-                }
-                case Opcode::RST_0x08: {
-                    psh_todo();
-                    break;
-                }
                 case Opcode::RET_NC: {
-                    psh_todo();
-                    break;
-                }
-                case Opcode::POP_DE: {
-                    psh_todo();
-                    break;
-                }
-                case Opcode::CALL_NC_U16: {
-                    psh_todo();
-                    break;
-                }
-                case Opcode::PUSH_DE: {
-                    psh_todo();
-                    break;
-                }
-                case Opcode::RST_0x10: {
                     psh_todo();
                     break;
                 }
@@ -1091,11 +1223,12 @@ namespace mina {
                     psh_todo();
                     break;
                 }
-                case Opcode::CALL_C_U16: {
+
+                case Opcode::POP_BC: {
                     psh_todo();
                     break;
                 }
-                case Opcode::RST_0x18: {
+                case Opcode::POP_DE: {
                     psh_todo();
                     break;
                 }
@@ -1103,7 +1236,46 @@ namespace mina {
                     psh_todo();
                     break;
                 }
-                case Opcode::PUSH_HL: {
+                case Opcode::POP_AF: {
+                    psh_todo();
+                    break;
+                }
+
+                case Opcode::CALL_NZ_U16: {
+                    psh_todo();
+                    break;
+                }
+                case Opcode::CALL_Z_U16: {
+                    psh_todo();
+                    break;
+                }
+                case Opcode::CALL_NC_U16: {
+                    psh_todo();
+                    break;
+                }
+                case Opcode::CALL_C_U16: {
+                    psh_todo();
+                    break;
+                }
+
+                case Opcode::CALL_U16: {
+                    psh_todo();
+                    break;
+                }
+
+                case Opcode::RST_0x00: {
+                    psh_todo();
+                    break;
+                }
+                case Opcode::RST_0x08: {
+                    psh_todo();
+                    break;
+                }
+                case Opcode::RST_0x10: {
+                    psh_todo();
+                    break;
+                }
+                case Opcode::RST_0x18: {
                     psh_todo();
                     break;
                 }
@@ -1115,23 +1287,7 @@ namespace mina {
                     psh_todo();
                     break;
                 }
-                case Opcode::POP_AF: {
-                    psh_todo();
-                    break;
-                }
-                case Opcode::DI: {
-                    psh_todo();
-                    break;
-                }
-                case Opcode::PUSH_AF: {
-                    psh_todo();
-                    break;
-                }
                 case Opcode::RST_0x30: {
-                    psh_todo();
-                    break;
-                }
-                case Opcode::EI: {
                     psh_todo();
                     break;
                 }
@@ -1140,9 +1296,18 @@ namespace mina {
                     break;
                 }
 
+                case Opcode::DI: {
+                    psh_todo();
+                    break;
+                }
+                case Opcode::EI: {
+                    psh_todo();
+                    break;
+                }
+
                 // Decode and execute the 0xCB-prefixed opcode.
                 case Opcode::PREFIX_0xCB: {
-                    cb_dexec(cpu);
+                    cb_decode_and_execute(cpu, bus_read_pc(cpu));
                     break;
                 }
 
@@ -1150,12 +1315,22 @@ namespace mina {
                     psh_todo_msg("STOP");
                     break;
                 }
+
+                // Received an ill opcode.
+                default: psh_unreachable();
             }
         }
     }  // namespace
 
-    void run_cpu_cycle(CPU& cpu) noexcept {
+    // -----------------------------------------------------------------------------
+    // - Implementation of the CPU's public interface. -
+    // -----------------------------------------------------------------------------
+
+    void sm83_run_cycle(SM83& cpu) noexcept {
         u8 data = bus_read_pc(cpu);
-        dexec(cpu, data);
+
+        psh_debug(opcode_to_string(static_cast<Opcode>(data)));
+
+        decode_and_execute(cpu, data);
     }
 }  // namespace mina

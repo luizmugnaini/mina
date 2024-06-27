@@ -16,7 +16,7 @@
 ///    51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
 ///
 ///
-/// Description: Game Boy's "DMG" CPU.
+/// Description: Original DMG Game Boy's Sharp SM83 CPU.
 /// Author: Luiz G. Mugnaini A. <luizmugnaini@gmail.com>
 
 #pragma once
@@ -41,29 +41,33 @@ namespace mina {
     ///       16-bit register it is best that we separate the stack pointer into its high and low
     ///       bytes.
     struct RegisterFile {
-        u8  f     = 0x00;
-        u8  a     = 0x00;
-        u8  c     = 0x00;
-        u8  b     = 0x00;
-        u8  e     = 0x00;
-        u8  d     = 0x00;
-        u8  l     = 0x00;
-        u8  h     = 0x00;
-        u8  sp_lo = 0x00;
-        u8  sp_hi = 0x00;
-        u16 pc    = 0x0000;
+        /// AF 16-bit register.
+        u8  f  = 0x00;
+        u8  a  = 0x00;
+        /// BC 16-bit register.
+        u8  c  = 0x00;
+        u8  b  = 0x00;
+        /// DE 16-bit register.
+        u8  e  = 0x00;
+        u8  d  = 0x00;
+        /// HL 16-bit register.
+        u8  l  = 0x00;
+        u8  h  = 0x00;
+        /// Stack pointer.
+        u16 sp = 0x0000;
+        /// Program counter.
+        u16 pc = 0x0000;
     };
 
-    /// DMG, the original Game Boy CPU.
+    /// Sharp SM83, the original Game Boy CPU.
     ///
-    /// The DMG is an SoC containing a Sharp SM83 CPU, which is based on the Zilog Z80 and
-    /// Intel 8080.
-    struct CPU {
+    /// This is a system on a chip (SoC) based on the Zilog Z80 and Intel 8080.
+    struct SM83 {
         RegisterFile regfile  = {};
         MemoryMap    mmap     = {};
         u16          bus_addr = 0x0000;
         u16          clock    = 0x0000;
     };
 
-    void run_cpu_cycle(CPU& cpu) noexcept;
+    void sm83_run_cycle(SM83& cpu) noexcept;
 }  // namespace mina

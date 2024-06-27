@@ -58,13 +58,15 @@ if CURRENT_LINKER == "mold":
 
 DEBUG_FLAGS = [
     "-DCMAKE_BUILD_TYPE=Debug",
-    "-DMINA_DEBUG=On",
-    "-DMINA_VULKAN_DEBUG=On",
+    "-DMINA_DEBUG=ON",
+    "-DMINA_VULKAN_DEBUG=ON",
+    "-DPSH_DEBUG=ON",
 ]
 RELEASE_FLAGS = [
     "-DCMAKE_BUILD_TYPE=Release",
-    "-DMINA_DEBUG=Off",
-    "-DMINA_VULKAN_DEBUG=Off",
+    "-DMINA_DEBUG=OFF",
+    "-DMINA_VULKAN_DEBUG=OFF",
+    "-DPSH_DEBUG=OFF",
 ]
 
 CPP_SRC_EXTENSION = ".cc"
@@ -210,7 +212,11 @@ def command_build(build_flags: list[str] = []):
 
 
 def command_run_mina(rom: str | None):
-    command_build()
+    match args.build:
+        case "debug":
+            command_build(build_flags=DEBUG_FLAGS)
+        case "release":
+            command_build(build_flags=RELEASE_FLAGS)
 
     header("Running game")
     cmd = (

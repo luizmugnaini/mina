@@ -18,19 +18,14 @@
 ///
 /// Description: Starting point for the Mina Emulator.
 /// Author: Luiz G. Mugnaini A. <luizmugnaini@gmail.com>
-
-#if defined(MINA_DEBUG)
-#    define PSH_DEBUG
-#endif
-
 #include <mina/cartridge.h>
-#include <mina/cpu/dmg.h>
 #include <mina/gfx/buffer.h>
 #include <mina/gfx/command.h>
 #include <mina/gfx/context.h>
 #include <mina/gfx/data.h>
 #include <mina/gfx/swap_chain.h>
 #include <mina/meta/info.h>
+#include <mina/sm83.h>
 #include <mina/window.h>
 #include <psh/assert.h>
 #include <psh/input.h>
@@ -50,7 +45,7 @@ struct Emulator {
     FrameMemory        frame_memory;
     GraphicsContext    gfx_context;
     Window             win;
-    CPU                cpu;
+    SM83               cpu;
     Cartridge          cart;
 
     static constexpr usize MAX_MEMORY_SIZE       = psh_mebibytes(64);
@@ -187,7 +182,7 @@ void run_emu(Emulator& emu, psh::StringView cart_path) noexcept {
     while (psh_likely(!emu.win.should_close)) {
         process_input_events(emu.win);
 
-        run_cpu_cycle(emu.cpu);
+        sm83_run_cycle(emu.cpu);
 
         // Graphics pipeline.
         {

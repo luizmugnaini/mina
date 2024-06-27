@@ -24,6 +24,7 @@ message(STATUS "Linker executable:       ${CMAKE_LINKER}")
 # ------------------------------------------------------------------------------
 
 option(MINA_DEBUG        "Enable all debugging resources"  ON)
+option(PSH_DEBUG         "Enable all debugging resources"  ON)
 option(MINA_VULKAN_DEBUG "Enable Vulkan validation layers" ON)
 
 # ------------------------------------------------------------------------------
@@ -47,6 +48,7 @@ set(MINA_CXX_SAN_FLAGS)  # Holds the resulting sanitizer flags for the build
 list(
     APPEND MINA_OPTIONS
         MINA_DEBUG
+        PSH_DEBUG
         MINA_VULKAN_DEBUG
 )
 
@@ -272,7 +274,7 @@ set(
     "${CMAKE_SOURCE_DIR}/src/cartridge.cc"
     "${CMAKE_SOURCE_DIR}/src/memory_map.cc"
     "${CMAKE_SOURCE_DIR}/src/window.cc"
-    "${CMAKE_SOURCE_DIR}/src/cpu/dmg.cc"
+    "${CMAKE_SOURCE_DIR}/src/sm83.cc"
     "${CMAKE_SOURCE_DIR}/src/gfx/buffer.cc"
     "${CMAKE_SOURCE_DIR}/src/gfx/command.cc"
     "${CMAKE_SOURCE_DIR}/src/gfx/context.cc"

@@ -116,31 +116,31 @@ namespace mina {
                 1,
                 &buf_copy_info);
 
-            usize vertex_buf_dst_offset  = info.dst_buf_offset;
-            usize uniform_buf_dst_offset = info.dst_buf_offset + info.vertex_buf_size;
-
-            // Prepare the uniform buffer memory for the vertex shader stage.
-            VkBufferMemoryBarrier transfer_uniform_buf_barrier{
-                .sType               = VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER,
-                .srcAccessMask       = VK_ACCESS_TRANSFER_WRITE_BIT,
-                .dstAccessMask       = VK_ACCESS_UNIFORM_READ_BIT,
-                .srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
-                .dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
-                .buffer              = info.dst_buf_handle,
-                .offset              = uniform_buf_dst_offset,
-                .size                = info.uniform_buf_size,
-            };
-            vkCmdPipelineBarrier(
-                transfer_cmd,
-                VK_PIPELINE_STAGE_TRANSFER_BIT,
-                VK_PIPELINE_STAGE_VERTEX_SHADER_BIT,
-                0,
-                0,
-                nullptr,
-                1,
-                &transfer_uniform_buf_barrier,
-                0,
-                nullptr);
+            usize vertex_buf_dst_offset = info.dst_buf_offset;
+            // usize uniform_buf_dst_offset = info.dst_buf_offset + info.vertex_buf_size;
+            //
+            // // Prepare the uniform buffer memory for the vertex shader stage.
+            // VkBufferMemoryBarrier transfer_uniform_buf_barrier{
+            //     .sType               = VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER,
+            //     .srcAccessMask       = VK_ACCESS_TRANSFER_WRITE_BIT,
+            //     .dstAccessMask       = VK_ACCESS_UNIFORM_READ_BIT,
+            //     .srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+            //     .dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+            //     .buffer              = info.dst_buf_handle,
+            //     .offset              = uniform_buf_dst_offset,
+            //     .size                = info.uniform_buf_size,
+            // };
+            // vkCmdPipelineBarrier(
+            //     transfer_cmd,
+            //     VK_PIPELINE_STAGE_TRANSFER_BIT,
+            //     VK_PIPELINE_STAGE_VERTEX_SHADER_BIT,
+            //     0,
+            //     0,
+            //     nullptr,
+            //     1,
+            //     &transfer_uniform_buf_barrier,
+            //     0,
+            //     nullptr);
 
             // Prepare the vertex buffer memory to be read by the vertex shader.
             VkBufferMemoryBarrier transfer_vertex_buf_barrier{
