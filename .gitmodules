@@ -1,6 +1,9 @@
 [submodule "thirdparty/presheaf"]
 	path = thirdparty/presheaf
-	url = https://github.com/luizmugnaini/presheaf
+	url = https://github.com/luizmugnaini/presheaf.git
 [submodule "thirdparty/VulkanMemoryAllocator"]
 	path = thirdparty/VulkanMemoryAllocator
 	url = https://github.com/luizmugnaini/VulkanMemoryAllocator.git
+[submodule "thirdparty/glfw"]
+	path = thirdparty/glfw
+	url = https://github.com/luizmugnaini/glfw.git
